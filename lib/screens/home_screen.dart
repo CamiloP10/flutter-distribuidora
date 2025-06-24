@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'inventario_screen.dart';
 import 'clientes_screen.dart';
 import 'factura_screen.dart';
+import 'ventas_screen.dart';
 import '../db/db_helper.dart';
 import '../models/cliente.dart';
 import '../models/producto.dart';
@@ -50,7 +51,7 @@ class HomeScreen extends StatelessWidget {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => InventarioScreen()),
+                  MaterialPageRoute(builder: (context) => VentasScreen()),
                 );
               },
               icon: Icon(Icons.shopify),

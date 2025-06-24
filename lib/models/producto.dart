@@ -3,7 +3,7 @@ class Producto {
   final String codigo;
   final String nombre;
   final String presentacion;
-  final int cantidad;
+  final double cantidad;
   final double precio;
 
   Producto({
@@ -36,7 +36,7 @@ class Producto {
       codigo: map['codigo'],
       nombre: map['nombre'],
       presentacion: map['presentacion'],
-      cantidad: map['cantidad'],
+      cantidad: map['cantidad']?.toDouble() ?? 0.0, //conversión segura para decimal
       precio: map['precio'],
     );
   }

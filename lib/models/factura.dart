@@ -1,21 +1,36 @@
 class Factura {
   final int? id;
-  final int clienteId;
+  final int? clienteId;
   final DateTime fecha;
   final double total;
+  final double pagado;
+  final double saldoPendiente; // <- nuevo campo
+  final String tipoPago;
+  final String estadoPago;     // <- nuevo campo
+  final String informacion;
 
   Factura({
     this.id,
-    required this.clienteId,
+    this.clienteId,
     required this.fecha,
     required this.total,
+    required this.pagado,
+    required this.saldoPendiente,
+    required this.tipoPago,
+    required this.estadoPago,
+    required this.informacion,
   });
 
   Map<String, dynamic> toMap() {
     final map = <String, dynamic>{
       'clienteId': clienteId,
-      'fecha': fecha.toIso8601String(), // <- convertir DateTime a String
+      'fecha': fecha.toIso8601String(),
       'total': total,
+      'pagado': pagado,
+      'saldoPendiente': saldoPendiente,
+      'tipoPago': tipoPago,
+      'estadoPago': estadoPago,
+      'informacion': informacion,
     };
     if (id != null) {
       map['id'] = id;
@@ -27,10 +42,16 @@ class Factura {
     return Factura(
       id: map['id'],
       clienteId: map['clienteId'],
-      fecha: DateTime.parse(map['fecha']), // <- convertir String a DateTime
+      fecha: DateTime.parse(map['fecha']),
       total: map['total'],
+      pagado: map['pagado'],
+      saldoPendiente: map['saldoPendiente'],
+      tipoPago: map['tipoPago'],
+      estadoPago: map['estadoPago'],
+      informacion: map['informacion'] ?? '',
     );
   }
 }
+
 
 

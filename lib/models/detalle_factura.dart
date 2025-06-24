@@ -1,31 +1,32 @@
+//Guarda los detalles de la factura: qué producto, cuántos, precios, etc.
 class DetalleFactura {
-  final int? id;
-   int facturaId;
-  final int productoId;
-  final int cantidad;
-  final double precioUnitario;
+  int? id;
+  int facturaId;
+  int productoId;
+  double cantidad;
+  double precioOriginal;
+  double precioModificado;
 
   DetalleFactura({
     this.id,
     required this.facturaId,
     required this.productoId,
     required this.cantidad,
-    required this.precioUnitario,
+    required this.precioOriginal,
+    required this.precioModificado,
   });
 
-  double get total => cantidad * precioUnitario;
+  double get subtotal => cantidad * precioModificado;
 
   Map<String, dynamic> toMap() {
-    final map = <String, dynamic>{
+    return {
+      'id': id,
       'facturaId': facturaId,
       'productoId': productoId,
       'cantidad': cantidad,
-      'precioUnitario': precioUnitario,
+      'precioOriginal': precioOriginal,
+      'precioModificado': precioModificado,
     };
-    if (id != null) {
-      map['id'] = id;
-    }
-    return map;
   }
 
   factory DetalleFactura.fromMap(Map<String, dynamic> map) {
@@ -34,8 +35,10 @@ class DetalleFactura {
       facturaId: map['facturaId'],
       productoId: map['productoId'],
       cantidad: map['cantidad'],
-      precioUnitario: map['precioUnitario'],
+      precioOriginal: map['precioOriginal'],
+      precioModificado: map['precioModificado'],
     );
   }
 }
+
 

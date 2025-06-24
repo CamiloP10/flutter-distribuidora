@@ -3,34 +3,21 @@ import 'package:path/path.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:csv/csv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
 import '../models/producto.dart';
 import '../models/cliente.dart';
 import '../models/factura.dart';
 import '../models/detalle_factura.dart';
 
-import 'dart:convert';
-
 class DBHelper {
   static Database? _db;
 
-  // Inicializar la base de datos
   static Future<Database> initDb() async {
     if (_db != null) return _db!;
-
     String path = join(await getDatabasesPath(), 'inventario.db');
-    //await deleteDatabase(path); // <--- DESCOMENTAR para reiniciar la DB
-
-    _db = await openDatabase(
-      path,
-      version: 1,
-      onCreate: _onCreate,
-    );
-
+    _db = await openDatabase(path, version: 1, onCreate: _onCreate);
     return _db!;
   }
 
-  // Crear las tablas
   static Future<void> _onCreate(Database db, int version) async {
     await db.execute('''
       CREATE TABLE cliente (
@@ -44,10 +31,10 @@ class DBHelper {
     await db.execute('''
       CREATE TABLE producto (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        codigo text,
+        codigo TEXT,
         nombre TEXT,
         presentacion TEXT,
-        cantidad INTEGER,
+        cantidad REAL,
         precio REAL
       )
     ''');
@@ -57,7 +44,12 @@ class DBHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         clienteId INTEGER,
         fecha TEXT,
-        total REAL
+        total REAL,
+        pagado REAL,
+        saldoPendiente REAL,
+        tipoPago TEXT,
+        estadoPago TEXT,
+        informacion TEXT
       )
     ''');
 
@@ -66,13 +58,14 @@ class DBHelper {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         facturaId INTEGER,
         productoId INTEGER,
-        cantidad INTEGER,
-        precioUnitario REAL
+        cantidad REAL,
+        precioOriginal REAL,
+        precioModificado REAL
       )
     ''');
   }
 
-  // FUNCIONES PARA PRODUCTOS
+  // PRODUCTOS
   static Future<int> insertarProducto(Producto producto) async {
     final db = await initDb();
     return await db.insert('producto', producto.toMap());
@@ -80,11 +73,11 @@ class DBHelper {
 
   static Future<List<Producto>> obtenerProductos() async {
     final db = await initDb();
-    final List<Map<String, dynamic>> maps = await db.query('producto');
-    return List.generate(maps.length, (i) => Producto.fromMap(maps[i]));
+    final maps = await db.query('producto');
+    return maps.map((e) => Producto.fromMap(e)).toList();
   }
 
-  // FUNCIONES PARA CLIENTES
+  // CLIENTES
   static Future<int> insertarCliente(Cliente cliente) async {
     final db = await initDb();
     return await db.insert('cliente', cliente.toMap());
@@ -92,8 +85,8 @@ class DBHelper {
 
   static Future<List<Cliente>> obtenerClientes() async {
     final db = await initDb();
-    final List<Map<String, dynamic>> maps = await db.query('cliente');
-    return List.generate(maps.length, (i) => Cliente.fromMap(maps[i]));
+    final maps = await db.query('cliente');
+    return maps.map((e) => Cliente.fromMap(e)).toList();
   }
 
   // FACTURAS
@@ -104,97 +97,71 @@ class DBHelper {
 
   static Future<List<Factura>> obtenerFacturas() async {
     final db = await initDb();
-    final List<Map<String, dynamic>> maps = await db.query('factura');
-    return List.generate(maps.length, (i) => Factura.fromMap(maps[i]));
+    final maps = await db.query('factura', orderBy: 'fecha DESC');
+    return maps.map((e) => Factura.fromMap(e)).toList();
   }
 
   // DETALLES DE FACTURA
   static Future<void> insertarDetallesFactura(List<DetalleFactura> detalles) async {
     final db = await initDb();
-    for (var detalle in detalles) {
-      await db.insert('detalle_factura', detalle.toMap());
+    for (final d in detalles) {
+      await db.insert('detalle_factura', d.toMap());
     }
   }
 
-  // IMPORTAR INVENTARIO DESDE CSV
+  static Future<List<DetalleFactura>> obtenerDetallesFactura(int facturaId) async {
+    final db = await initDb();
+    final maps = await db.query('detalle_factura', where: 'facturaId = ?', whereArgs: [facturaId]);
+    return maps.map((e) => DetalleFactura.fromMap(e)).toList();
+  }
+
+  // IMPORTAR INVENTARIO
   static Future<void> importarInventarioDesdeCSV() async {
     final prefs = await SharedPreferences.getInstance();
     final yaImportado = prefs.getBool('inventario_cargado') ?? false;
+    if (yaImportado) return;
 
-    //forzar recarga
-    //await prefs.setBool('inventario_cargado', false); // Forzar que se recargue
-
-    // comentar el if  cuando se esta forzando a recargar onCreate
-    if (yaImportado) {
-      print("Inventario ya cargado previamente. No se importa de nuevo.");
-      return;
-    }
-
-      try {
-        final rawData = await rootBundle.loadString('assets/Inventario.csv');
-        //final rows = const CsvToListConverter().convert(rawData);
-        final rows = const CsvToListConverter(fieldDelimiter: ';').convert(rawData);
-
-        for (int i = 1; i < rows.length; i++) {
-          final row = rows[i];
-
-          final producto = Producto(
-            codigo: row[0].toString(),
-            nombre: row[1].toString(),
-            presentacion: row[2].toString(),
-            cantidad: int.tryParse(row[3].toString()) ?? 0,
-            precio: double.tryParse(row[4].toString()) ?? 0.0,
-          );
-
-          await insertarProducto(producto);
-        }
-
-        await prefs.setBool('inventario_cargado', true);
-        print('Inventario importado correctamente desde CSV');
-
-      } catch (e) {
-        print('Error al importar el CSV: $e');
+    try {
+      final data = await rootBundle.loadString('assets/Inventario.csv');
+      final rows = const CsvToListConverter(fieldDelimiter: ';').convert(data);
+      for (int i = 1; i < rows.length; i++) {
+        final row = rows[i];
+        final producto = Producto(
+          codigo: row[0].toString(),
+          nombre: row[1].toString(),
+          presentacion: row[2].toString(),
+          cantidad: double.tryParse(row[3].toString()) ?? 0,
+          precio: double.tryParse(row[4].toString()) ?? 0,
+        );
+        await insertarProducto(producto);
       }
+      await prefs.setBool('inventario_cargado', true);
+    } catch (e) {
+      print('Error al importar inventario: $e');
     }
+  }
 
-  // IMPORTAR clientes DESDE CSV
+  // IMPORTAR CLIENTES
   static Future<void> importarClientesDesdeCSV() async {
     final prefs = await SharedPreferences.getInstance();
     final yaImportado = prefs.getBool('clientes_cargados') ?? false;
-
-    // Forzar recarga:
-    //await prefs.setBool('clientes_cargados', false); // Forzar que se recargue
-
-    // comentar el if  cuando se esta forzando a recargar onCreate
-    if (yaImportado) {
-      print("Clientes ya cargados previamente. No se importa de nuevo.");
-      return;
-    }
+    if (yaImportado) return;
 
     try {
       final data = await rootBundle.loadString('assets/clientes.csv');
       final rows = const CsvToListConverter(fieldDelimiter: ';').convert(data);
-
       for (int i = 1; i < rows.length; i++) {
         final row = rows[i];
-
         final cliente = Cliente(
           nombre: row[0].toString(),
           telefono: row[1].toString(),
           informacion: row[2].toString(),
         );
-
         await insertarCliente(cliente);
       }
-
       await prefs.setBool('clientes_cargados', true);
-      print('Clientes importados correctamente desde CSV');
     } catch (e) {
-      print('Error al importar clientes desde CSV: $e');
+      print('Error al importar clientes: $e');
     }
   }
 }
-
-
-
-

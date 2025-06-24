@@ -22,7 +22,7 @@ class _AgregarProductoScreenState extends State<AgregarProductoScreen> {
       codigo: 'P${DateTime.now().millisecondsSinceEpoch}', // ID único
       nombre: nombreController.text,
       presentacion: presentacionController.text,
-      cantidad: int.tryParse(cantidadController.text) ?? 0,
+      cantidad: double.tryParse(cantidadController.text) ?? 0,
       precio: double.tryParse(precioController.text) ?? 0.0,
     );
 
