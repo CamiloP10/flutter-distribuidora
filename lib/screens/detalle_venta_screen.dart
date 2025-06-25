@@ -73,11 +73,11 @@ class DetalleVentaScreen extends StatelessWidget {
                   final d = detalles[index];
                   final p = productosMap[d.productoId];
                   return ListTile(
-                    title: Text('${p?.nombre ?? 'Producto eliminado'} - ${p?.presentacion ?? ''}'),
+                    title: Text('${p?.nombre ?? 'NR'} - ${p?.presentacion ?? ''}'),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Cantidad: ${d.cantidad}'),
+                        Text('Cantidad: ${formatearCantidad(d.cantidad)}'),
                         if (d.precioOriginal != d.precioModificado)
                           Text(
                             'Precio original: \$${currencyFormat.format(d.precioOriginal)}',
@@ -87,12 +87,20 @@ class DetalleVentaScreen extends StatelessWidget {
                             ),
                           ),
                         Text(
-                          'Precio final: \$${currencyFormat.format(d.precioModificado)}',
+                          'Precio final U: \$${currencyFormat.format(d.precioModificado)}',
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ],
                     ),
-                    trailing: Text('Subtotal: \$${currencyFormat.format(d.subtotal)}'),
+                    trailing: Text(
+                      ' Tot: \$${currencyFormat.format(d.subtotal)}',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+
                   );
                 },
               ),
@@ -102,4 +110,8 @@ class DetalleVentaScreen extends StatelessWidget {
       ),
     );
   }
+  String formatearCantidad(double cantidad) {
+    return cantidad % 1 == 0 ? cantidad.toInt().toString() : cantidad.toString();
+  }
+
 }
