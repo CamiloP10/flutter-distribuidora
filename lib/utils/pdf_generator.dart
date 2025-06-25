@@ -1,0 +1,268 @@
+///*
+/////papel 58mm (no se ajusta al ancho)
+import 'dart:typed_data';
+import 'package:flutter/services.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:pdf/pdf.dart';
+import 'package:intl/intl.dart';
+
+import '../models/factura.dart';
+import '../models/detalle_factura.dart';
+import '../models/producto.dart';
+import '../models/cliente.dart';
+
+class PdfGenerator {
+  static Future<Uint8List> generarFacturaPDF({
+    required Factura factura,
+    required Cliente? cliente,
+    required List<DetalleFactura> detalles,
+    required List<Producto> productos,
+  }) async {
+    final pdf = pw.Document();
+    final logo = await _cargarLogo();
+    final qr = await _cargarQr();
+    final formatMiles = NumberFormat('#,###', 'es_CO');
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat(58 * PdfPageFormat.mm, PdfPageFormat.a4.height),
+        margin: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+        build: (context) => [
+          pw.Center(child: pw.Image(logo, width: 85)),
+          pw.SizedBox(height: 8),
+          pw.Center(child: pw.Text('MAYORISTA LA BELLEZA', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))),
+          pw.Center(child: pw.Text('NIT: 79.736.209-9', style: pw.TextStyle(fontSize: 9))),
+          pw.Center(child: pw.Text('Tel: 313 390 9767', style: pw.TextStyle(fontSize: 9))),
+          pw.Center(child: pw.Text('labellezamayorista@gmail', style: pw.TextStyle(fontSize: 9))),
+          pw.Center(child: pw.Text('Mochuelo bajo', style: pw.TextStyle(fontSize: 9))),
+          pw.Divider(),
+          pw.SizedBox(height: 5),
+          pw.Text('Factura N°: ${factura.id}', style: pw.TextStyle(fontSize: 9)),
+          pw.Text('Fecha: ${factura.fecha.toString().substring(0, 16)}', style: pw.TextStyle(fontSize: 9)),
+          pw.Text('Estado: ${factura.estadoPago}', style: pw.TextStyle(fontSize: 9)),
+          pw.Text('Cliente: ${cliente?.nombre ?? '--'}', style: const pw.TextStyle(fontSize: 9)),
+          pw.Text('Tel: ${cliente?.telefono ?? '—-'}', style: const pw.TextStyle(fontSize: 9)),
+          pw.Divider(),
+          pw.Text('# Producto', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text('Cantidad', style: const pw.TextStyle(fontSize: 8)),
+              pw.Text('Precio', style: const pw.TextStyle(fontSize: 8)),
+              pw.Text('SubTotal', style: const pw.TextStyle(fontSize: 8)),
+            ],
+          ),
+          pw.Divider(),
+
+          ...detalles.map((d) {
+            final producto = productos.firstWhere((p) => p.id == d.productoId);
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text('# ${producto.presentacion}', style: const pw.TextStyle(fontSize: 9)),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('${formatearNumero(d.cantidad)}', style: const pw.TextStyle(fontSize: 8)),
+                    pw.Text('\$${formatMiles.format(d.precioModificado)}', style: const pw.TextStyle(fontSize: 8)),
+                    pw.Text('\$${formatMiles.format(d.cantidad * d.precioModificado)}', style: const pw.TextStyle(fontSize: 8)),
+                  ],
+                ),
+                pw.SizedBox(height: 4),
+              ],
+            );
+          }).toList(),
+
+          pw.Divider(),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text('Total:', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              pw.Text('\$${formatMiles.format(factura.total)}', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+            ],
+          ),
+          pw.Text('Pagado: \$${formatMiles.format(factura.pagado)}', style: const pw.TextStyle(fontSize: 9)),
+          pw.Text('Saldo: \$${formatMiles.format(factura.saldoPendiente)}', style: const pw.TextStyle(fontSize: 9)),
+          pw.SizedBox(height: 8),
+          pw.Divider(),
+          pw.Center(child: pw.Text('WHATSAPP:', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))),
+          pw.Center(child: pw.Image(qr, width: 70)),
+          pw.SizedBox(height: 5),
+          pw.Text(
+            'ESTA FACTURA SE ASIMILA EN TODOS SUS EFECTOS A UNA LETRA DE CAMBIO (ART 774 DEL CODIGO DE COMERCIO)',
+            textAlign: pw.TextAlign.justify,
+            style: const pw.TextStyle(fontSize: 8),
+          ),
+          pw.SizedBox(height: 8),
+          pw.Center(child: pw.Text('GRACIAS POR SU COMPRA', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))),
+          pw.Center(child: pw.Text('MAYORISTA LA BELLEZA ®', style: pw.TextStyle(fontSize: 9))),
+        ],
+      ),
+    );
+    return pdf.save();
+  }
+
+  static Future<pw.ImageProvider> _cargarLogo() async {
+    final data = await rootBundle.load('assets/icon.png');
+    final bytes = data.buffer.asUint8List();
+    return pw.MemoryImage(bytes);
+  }
+
+  static Future<pw.ImageProvider> _cargarQr() async {
+    final data = await rootBundle.load('assets/qr.png');
+    final bytes = data.buffer.asUint8List();
+    return pw.MemoryImage(bytes);
+  }
+
+  static String formatearNumero(double numero) {
+    return numero % 1 == 0 ? numero.toInt().toString() : numero.toString();
+  }
+}
+//*/
+
+/*
+// ajustado a tamaño pdf A4 con multipage
+import 'dart:typed_data';
+import 'package:flutter/services.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:pdf/pdf.dart';
+import 'package:intl/intl.dart';
+
+import '../models/factura.dart';
+import '../models/detalle_factura.dart';
+import '../models/producto.dart';
+import '../models/cliente.dart';
+
+class PdfGenerator {
+  static Future<Uint8List> generarFacturaPDF({
+    required Factura factura,
+    required Cliente? cliente,
+    required List<DetalleFactura> detalles,
+    required List<Producto> productos,
+  }) async {
+    final pdf = pw.Document();
+    final logo = await _cargarLogo();
+    final qr = await _cargarQr();
+    final formatMiles = NumberFormat('#,###', 'es_CO');
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        build: (context) => [
+          pw.Center(child: pw.Image(logo, width: 300)),
+          pw.SizedBox(height: 20),
+          pw.Center(child: pw.Text(
+            'MAYORISTA LA BELLEZA',
+            style: pw.TextStyle(fontSize: 40, fontWeight: pw.FontWeight.bold),
+          )),
+          pw.SizedBox(height: 20),
+          pw.Center(child: pw.Text('NIT: 79.736.209-9', style: pw.TextStyle(fontSize: 30))),
+          pw.Center(child: pw.Text('Tel: 313 390 9767', style: pw.TextStyle(fontSize: 30))),
+          pw.Center(child: pw.Text('labellezamayorista@gmail', style: pw.TextStyle(fontSize: 30))),
+          pw.Center(child: pw.Text('Mochuelo bajo', style: pw.TextStyle(fontSize: 30))),
+          pw.Divider(thickness: 3.0),
+          pw.SizedBox(height: 20),
+
+          pw.Text('Fecha: ${factura.fecha.toString().substring(0, 16)}', style: pw.TextStyle(fontSize: 30)),
+          pw.Text('Cliente: ${cliente?.nombre ?? '--'}', style: pw.TextStyle(fontSize: 30)),
+          pw.Text('Tel: ${cliente?.telefono ?? '—'}', style: pw.TextStyle(fontSize: 30)),
+          pw.SizedBox(height: 20),
+          pw.Divider(thickness: 5.0),
+          pw.Text('Detalle de Productos', style: pw.TextStyle(fontSize: 30, fontWeight: pw.FontWeight.bold)),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text('Cantidad', style: pw.TextStyle(fontSize: 30, fontWeight: pw.FontWeight.bold)),
+              pw.Text('Precio', style: pw.TextStyle(fontSize: 30, fontWeight: pw.FontWeight.bold)),
+              pw.Text('Subtotal', style: pw.TextStyle(fontSize: 30, fontWeight: pw.FontWeight.bold)),
+              pw.Divider(),
+            ],
+          ),
+          pw.Divider(thickness: 3.0,),
+
+          ...detalles.map((d) {
+            final producto = productos.firstWhere((p) => p.id == d.productoId);
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text('# ${producto.presentacion}', style: pw.TextStyle(fontSize: 30)),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Text('${formatearNumero(d.cantidad)}', style: pw.TextStyle(fontSize: 30)),
+                    pw.Text('\$${formatMiles.format(d.precioModificado)}', style: pw.TextStyle(fontSize: 30)),
+                    pw.Text('\$${formatMiles.format(d.cantidad * d.precioModificado)}', style: pw.TextStyle(fontSize: 30)),
+                  ],
+                ),
+                pw.SizedBox(height: 10),
+              ],
+            );
+          }).toList(),
+
+          pw.Divider(thickness: 3.0),
+          pw.SizedBox(height: 20),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text('Total:', style: pw.TextStyle(fontSize: 35, fontWeight: pw.FontWeight.bold)),
+              pw.Text('\$${formatMiles.format(factura.total)}', style: pw.TextStyle(fontSize: 35, fontWeight: pw.FontWeight.bold)),
+            ],
+          ),
+          pw.Text('Pagado: \$${formatMiles.format(factura.pagado)}', style: pw.TextStyle(fontSize: 30)),
+          pw.Text('Saldo: \$${formatMiles.format(factura.saldoPendiente)}', style: pw.TextStyle(fontSize: 30)),
+
+          if (factura.informacion.isNotEmpty) ...[
+            pw.SizedBox(height: 20),
+            pw.Text('Obs: ${factura.informacion}', style: pw.TextStyle(fontSize: 30), textAlign: pw.TextAlign.justify),
+          ],
+
+          pw.Divider(thickness: 5.0),
+          pw.SizedBox(height: 20),
+          pw.Center(
+            child: pw.Text('WHATSAPP:',
+                style: pw.TextStyle(fontSize: 30, fontWeight: pw.FontWeight.bold)),
+          ),
+          pw.Center(
+            child: pw.SizedBox(
+              width: 250,
+              height: 250,
+              child: pw.Image(qr, fit: pw.BoxFit.contain),
+            ),
+          ),
+          pw.Text(
+            'ESTA FACTURA SE ASIMILA EN TODOS SUS EFECTOS A UNA LETRA DE CAMBIO (ART 774 DEL CÓDIGO DE COMERCIO)',
+            textAlign: pw.TextAlign.justify,
+            style: pw.TextStyle(fontSize: 25),
+          ),
+          pw.SizedBox(height: 20),
+          pw.Center(
+            child: pw.Text('¡GRACIAS POR SU COMPRA!',
+                style: pw.TextStyle(fontSize: 30, fontWeight: pw.FontWeight.bold)),
+          ),
+          pw.SizedBox(height: 20),
+          pw.Center(child: pw.Text('MAYORISTA LA BELLEZA ®', style: pw.TextStyle(fontSize: 25))),
+          pw.SizedBox(height: 100),
+        ],
+      ),
+    );
+    return pdf.save();
+  }
+
+  static Future<pw.ImageProvider> _cargarLogo() async {
+    final data = await rootBundle.load('assets/icon.png');
+    final bytes = data.buffer.asUint8List();
+    return pw.MemoryImage(bytes);
+  }
+
+  static Future<pw.ImageProvider> _cargarQr() async {
+    final data = await rootBundle.load('assets/qr.png');
+    final bytes = data.buffer.asUint8List();
+    return pw.MemoryImage(bytes);
+  }
+
+  static String formatearNumero(double numero) {
+    return numero % 1 == 0 ? numero.toInt().toString() : numero.toString();
+  }
+}
+*/

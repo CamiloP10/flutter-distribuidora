@@ -1,3 +1,4 @@
+//documento general. Representa la cabecera del documento: fecha, total, cliente,
 class Factura {
   final int? id;
   final int? clienteId;
@@ -49,6 +50,30 @@ class Factura {
       tipoPago: map['tipoPago'],
       estadoPago: map['estadoPago'],
       informacion: map['informacion'] ?? '',
+    );
+  }
+
+  Factura copyWith({
+    int? id,
+    int? clienteId,
+    DateTime? fecha,
+    double? total,
+    double? pagado,
+    double? saldoPendiente,
+    String? tipoPago,
+    String? estadoPago,
+    String? informacion,
+  }) {
+    return Factura(
+      id: id ?? this.id,
+      clienteId: clienteId ?? this.clienteId,
+      fecha: fecha ?? this.fecha,
+      total: total ?? this.total,
+      pagado: pagado ?? this.pagado,
+      saldoPendiente: saldoPendiente ?? this.saldoPendiente,
+      tipoPago: tipoPago ?? this.tipoPago,
+      estadoPago: estadoPago ?? this.estadoPago,
+      informacion: informacion ?? this.informacion,
     );
   }
 }

@@ -1,4 +1,4 @@
-//Guarda los detalles de la factura: qué producto, cuántos, precios, etc.
+//Representa cada línea de la factura: un producto, su cantidad, precio y subtotal.
 class DetalleFactura {
   int? id;
   int facturaId;

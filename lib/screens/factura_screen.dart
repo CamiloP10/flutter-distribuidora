@@ -5,6 +5,13 @@ import '../models/detalle_factura.dart';
 import '../models/factura.dart';
 import '../db/db_helper.dart';
 import 'package:intl/intl.dart';
+import '../utils/pdf_generator.dart';
+import 'package:printing/printing.dart';
+import 'package:pdf/pdf.dart';
+//para compartir en lugar de mostrar pdf
+import 'dart:io';
+import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
 
 class FacturaScreen extends StatefulWidget {//card
   final List<Cliente> clientes;
@@ -37,20 +44,35 @@ class _FacturaScreenState extends State<FacturaScreen> {
   }
 
   void filtrarClientes(String query) {
-    final q = query.toLowerCase();
+    final q = query.trim().toLowerCase();
+
     if (q.isEmpty) {
       setState(() {
         clientesFiltrados = [];
       });
       return;
     }
+
+    final encontrados = widget.clientes.where((c) {
+      return c.nombre.toLowerCase().contains(q) ||
+          c.informacion.toLowerCase().contains(q);
+    }).toList();
+
     setState(() {
-      clientesFiltrados = widget.clientes.where((c) {
-        return c.nombre.toLowerCase().contains(q) ||
-            c.informacion.toLowerCase().contains(q);
-      }).toList();
+      clientesFiltrados = encontrados;
+
+      // Si no se encontró nada, asignar cliente temporal
+      if (encontrados.isEmpty) {
+        clienteSeleccionado = Cliente(
+          id: null,
+          nombre: clienteBusquedaController.text.trim(),
+          telefono: '',
+          informacion: '',
+        );
+      }
     });
   }
+
 
   void filtrarProductos(String query) {
     final q = query.toLowerCase();
@@ -62,8 +84,7 @@ class _FacturaScreenState extends State<FacturaScreen> {
     }
     setState(() {
       productosFiltrados = widget.productos.where((p) {
-        return p.nombre.toLowerCase().contains(q) ||
-            p.presentacion.toLowerCase().contains(q);
+        return p.presentacion.toLowerCase().contains(q);
       }).toList();
     });
   }
@@ -81,11 +102,11 @@ class _FacturaScreenState extends State<FacturaScreen> {
       detalles.add(DetalleFactura(
         facturaId: 0,
         productoId: producto.id!,
-        cantidad: 0, // vacío por defecto
+        cantidad: 1, // 1 por defecto
         precioOriginal: producto.precio,
         precioModificado: precioModificado,
       ));
-      cantidadControllers.add(TextEditingController(text: ''));
+      cantidadControllers.add(TextEditingController(text: '1'));
       precioControllers.add(TextEditingController(text: precioModificado.toStringAsFixed(0)));
     });
   }
@@ -176,6 +197,8 @@ class _FacturaScreenState extends State<FacturaScreen> {
                     final saldo = total - pago;
                     final estado = saldo <= 0 ? 'Pagado' : 'Crédito';
                     final tipoGuardado = tipoPagoSeleccionado == 'Pago total' ? 'Contado' : 'Crédito';
+
+
                     final factura = Factura(
                       clienteId: clienteSeleccionado?.id,
                       fecha: DateTime.now(),
@@ -187,13 +210,38 @@ class _FacturaScreenState extends State<FacturaScreen> {
                       estadoPago: estado,
                     );
                     final facturaId = await DBHelper.insertarFactura(factura);
+                    final facturaConId = factura.copyWith(id: facturaId);
+
                     for (var d in detalles) {
                       d.facturaId = facturaId;
                     }
                     await DBHelper.insertarDetallesFactura(detalles);
 
+                    // Guarda cliente antes de limpiar
+                    final cliente = clienteSeleccionado;
+
                     Navigator.pop(context);
 
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Factura registrada correctamente.')),
+                    );
+
+                    //Genera y muestra el PDF
+                    /*await generarYMostrarPDF(
+                      factura: factura,
+                      cliente: cliente,
+                      detalles: detalles,
+                      productos: widget.productos,
+                    );*/
+                    //Genera y comparte el PDF
+                    await generarYCompartirPDF(
+                      factura: facturaConId,
+                      cliente: cliente,
+                      detalles: detalles,
+                      productos: widget.productos,
+                    );
+
+                    // limpia la UI
                     setState(() {
                       clienteSeleccionado = null;
                       detalles.clear();
@@ -203,9 +251,6 @@ class _FacturaScreenState extends State<FacturaScreen> {
                       productoBusquedaController.clear();
                     });
 
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Factura registrada correctamente.')),
-                    );
                   },
                   child: const Text('Confirmar'),
                 ),
@@ -216,6 +261,49 @@ class _FacturaScreenState extends State<FacturaScreen> {
       },
     );
   }
+
+  /*Future<void> generarYMostrarPDF({
+    required Factura factura,
+    required Cliente? cliente,
+    required List<DetalleFactura> detalles,
+    required List<Producto> productos,
+  }) async {
+    final pdfBytes = await PdfGenerator.generarFacturaPDF(
+      factura: factura,
+      cliente: cliente,
+      detalles: detalles,
+      productos: productos,
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat format) async => pdfBytes,
+    );
+  }*/
+
+  Future<void> generarYCompartirPDF({
+    required Factura factura,
+    required Cliente? cliente,
+    required List<DetalleFactura> detalles,
+    required List<Producto> productos,
+  }) async {
+    final pdfBytes = await PdfGenerator.generarFacturaPDF(
+      factura: factura,
+      cliente: cliente,
+      detalles: detalles,
+      productos: productos,
+    );
+
+    final outputDir = await getTemporaryDirectory();
+    final file = File("${outputDir.path}/factura_${factura.id}.pdf");
+
+    await file.writeAsBytes(pdfBytes);
+
+    await Share.shareXFiles(
+      [XFile(file.path)],
+      text: 'Factura #${factura.id} generada desde la app.',
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -312,7 +400,7 @@ class _FacturaScreenState extends State<FacturaScreen> {
               Column(
                 children: productosFiltrados.map((p) {
                   return ListTile(
-                    title: Text('${p.nombre} - ${p.presentacion}'),
+                    title: Text(p.presentacion),
                     subtitle: Text('Stock: ${p.cantidad} - \$${currencyFormat.format(p.precio)}'),
                     onTap: () {
                       agregarDetalle(p, 1, p.precio);
@@ -330,7 +418,6 @@ class _FacturaScreenState extends State<FacturaScreen> {
                 final index = entry.key;
                 final d = entry.value;
                 final producto = widget.productos.firstWhere((p) => p.id == d.productoId);
-
                 return Card(
                   color: Colors.blue[100],
                   margin: const EdgeInsets.symmetric(vertical: 8),
@@ -339,7 +426,7 @@ class _FacturaScreenState extends State<FacturaScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('${producto.nombre} - ${producto.presentacion}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        Text('- ${producto.presentacion}', style: const TextStyle(fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
