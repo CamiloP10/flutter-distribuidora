@@ -10,6 +10,8 @@ import 'screens/agregar_producto_screen.dart';
 import 'screens/agregar_cliente_screen.dart';
 
 import 'providers/ventas_provider.dart';
+import 'providers/cargue_provider.dart';
+
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,6 +29,7 @@ class AppWithProviders extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ProductoProvider()),
         ChangeNotifierProvider(create: (_) => ClienteProvider()),
         ChangeNotifierProvider(create: (_) => VentasProvider()),
+        ChangeNotifierProvider(create: (_) => CargueProvider()),
       ],
       child: const MyApp(),
     );

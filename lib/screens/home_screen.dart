@@ -7,6 +7,7 @@ import '../db/db_helper.dart';
 import '../models/cliente.dart';
 import '../models/producto.dart';
 import 'factura_screen.dart';
+import 'cargue_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -87,6 +88,22 @@ class HomeScreen extends StatelessWidget {
               },
               icon: Icon(Icons.people),
               label: Text('Clientes'),
+              style: ElevatedButton.styleFrom(
+                minimumSize: Size(double.infinity, 50),
+              ),
+            ),
+            SizedBox(height: 20),
+
+
+            ElevatedButton.icon( // para cargues
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const CargueScreen()),
+                );
+              },
+              icon: Icon(Icons.fire_truck),
+              label: Text('Asignar Cargue'),
               style: ElevatedButton.styleFrom(
                 minimumSize: Size(double.infinity, 50),
               ),
