@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../db/db_helper.dart';
 import '../models/factura.dart';
 import '../models/detalle_factura.dart';
 import '../models/producto.dart';
 import '../models/cliente.dart';
-import 'package:intl/intl.dart';
+import 'detalle_venta_screen.dart';
 
 class VentasScreen extends StatefulWidget {
   const VentasScreen({super.key});
@@ -61,38 +62,26 @@ class _VentasScreenState extends State<VentasScreen> {
         itemBuilder: (context, index) {
           final f = facturas[index];
           final cliente = clientesMap[f.clienteId];
-          return ExpansionTile(
-            title: Text('Factura #${f.id} - \$${currencyFormat.format(f.total)}'),
-            subtitle: Text(
-              '${cliente?.nombre ?? 'Cliente eliminado'} - ${DateFormat('dd/MM/yyyy').format(f.fecha)}',
-            ),
-            children: [
-              ListTile(
-                title: Text('Estado: ${f.estadoPago}'),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Pagado: \$${currencyFormat.format(f.pagado)}'),
-                    Text('Saldo: \$${currencyFormat.format(f.saldoPendiente)}'),
-                    Text('Tipo de Pago: ${f.tipoPago}'),
-                    if (f.informacion.isNotEmpty) Text('Observaciones: ${f.informacion}'),
-                  ],
+          return ListTile(
+            title: Text('Factura #${f.id} - ${cliente?.nombre ?? 'Cliente NR'}'),
+            subtitle: Text('${DateFormat('dd/MM/yyyy HH:mm').format(f.fecha)} - \$${currencyFormat.format(f.total)}'),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => DetalleVentaScreen(
+                    factura: f,
+                    cliente: cliente,
+                    detalles: detallesMap[f.id] ?? [],
+                    productosMap: productosMap,
+                  ),
                 ),
-              ),
-              const Divider(),
-              ...?detallesMap[f.id]?.map((d) {
-                final producto = productosMap[d.productoId];
-                return ListTile(
-                  title: Text('${producto?.nombre ?? 'Producto eliminado'} - ${producto?.presentacion ?? ''}'),
-                  subtitle: Text('Cantidad: ${d.cantidad}, Precio: \$${currencyFormat.format(d.precioModificado)}'),
-                  trailing: Text('Subtotal: \$${currencyFormat.format(d.subtotal)}'),
-                );
-              }).toList(),
-              const Divider(),
-            ],
+              );
+            },
           );
         },
       ),
     );
   }
 }
+
