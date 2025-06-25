@@ -17,8 +17,10 @@ class CargueScreen extends StatefulWidget {
 }
 
 class _CargueScreenState extends State<CargueScreen> {
-  String nombreRepartidor = '';
+  String vehiculoAsignado = '';
   final Set<int> facturasSeleccionadas = {};
+  final TextEditingController _conductorController = TextEditingController();
+  final TextEditingController _observacionController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +30,7 @@ class _CargueScreenState extends State<CargueScreen> {
     final clientes = Provider.of<ClienteProvider>(context).clientes;
 
     String obtenerNombreCliente(int? clienteId) {
-      if (clienteId == null) return 'Cliente desconocido';
+      if (clienteId == null) return 'Cliente NR';
       final cliente = clientes.firstWhere(
             (c) => c.id == clienteId,
         orElse: () => Cliente(id: 0, nombre: 'Cliente no encontrado', telefono: '', informacion: ''),
@@ -42,12 +44,29 @@ class _CargueScreenState extends State<CargueScreen> {
         padding: const EdgeInsets.all(12.0),
         child: Column(
           children: [
-            TextField(
+            DropdownButtonFormField<String>(
               decoration: const InputDecoration(
-                labelText: "Nombre del repartidor",
+                labelText: "Seleccione Vehículo de Cargue",
                 border: OutlineInputBorder(),
               ),
-              onChanged: (val) => setState(() => nombreRepartidor = val),
+              value: vehiculoAsignado.isEmpty ? null : vehiculoAsignado,
+              items: [
+                'JAC Roja',
+                'JAC Blanca',
+                'MotoCrg. Gris',
+                'MotoCrg. Blanco',
+                'Otro',
+              ].map((vehiculo) {
+                return DropdownMenuItem<String>(
+                  value: vehiculo,
+                  child: Text(vehiculo.isEmpty ? '-- Seleccionar --' : vehiculo),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  vehiculoAsignado = value ?? '';
+                });
+              },
             ),
             const SizedBox(height: 16),
             const Text("Selecciona las facturas a asignar:"),
@@ -76,35 +95,91 @@ class _CargueScreenState extends State<CargueScreen> {
                     // Ajusta esta línea según tu modelo:
                     title: Text("Factura #${idFactura} - ${obtenerNombreCliente(factura.clienteId)}"),
                     subtitle: Text(
-                      "Total: \$${factura.total.toStringAsFixed(2)} - ${factura.fecha.toString().substring(0, 16)}",
+                      "${factura.fecha.toString().substring(0, 16)} - Total: \$${factura.total.toStringAsFixed(0)}",
                     ),
                   );
                 },
               ),
             ),
             ElevatedButton.icon(
-              onPressed: nombreRepartidor.isNotEmpty && facturasSeleccionadas.isNotEmpty
+              onPressed: vehiculoAsignado.isNotEmpty && facturasSeleccionadas.isNotEmpty
                   ? () {
-                final nuevoCargue = Cargue(
-                  id: DateTime.now().millisecondsSinceEpoch,
-                  nombreRepartidor: nombreRepartidor,
-                  fecha: DateTime.now(),
-                  facturaIds: facturasSeleccionadas.toList(),
+                showDialog(
+                  context: context,
+                  builder: (context) {
+                    return AlertDialog(
+                      title: const Text("Detalles del Cargue"),
+                      content: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TextField(
+                              controller: _conductorController,
+                              decoration: const InputDecoration(
+                                labelText: "Nombre del conductor *",
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            TextField(
+                              controller: _observacionController,
+                              decoration: const InputDecoration(
+                                labelText: "Observaciones",
+                                border: OutlineInputBorder(),
+                              ),
+                              maxLines: 3,
+                            ),
+                          ],
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(context).pop(); // cerrar diálogo
+                          },
+                          child: const Text("Cancelar"),
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            final conductor = _conductorController.text.trim();
+                            if (conductor.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("El nombre del conductor es obligatorio")),
+                              );
+                              return;
+                            }
+
+                            final nuevoCargue = Cargue(
+                              id: DateTime.now().millisecondsSinceEpoch,
+                              vehiculoAsignado: vehiculoAsignado, // ahora representa el vehículo
+                              fecha: DateTime.now(),
+                              facturaIds: facturasSeleccionadas.toList(),
+                              conductor: conductor,
+                              observaciones: _observacionController.text.trim(),
+                            );
+
+
+                            cargueProvider.agregarCargue(nuevoCargue);
+
+                            Navigator.of(context).pop(); // cerrar diálogo
+                            Navigator.pop(context); // volver atrás
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text("Cargue generado exitosamente")),
+                            );
+                          },
+                          child: const Text("Confirmar"),
+                        ),
+                      ],
+                    );
+                  },
                 );
-
-                cargueProvider.agregarCargue(nuevoCargue);
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Cargue creado exitosamente")),
-                );
-
-                Navigator.pop(context);
               }
                   : null,
-              icon: const Icon(Icons.save),
-              label: const Text("Guardar cargue"),
+              icon: const Icon(Icons.fire_truck),
+              label: const Text("Generar Cargue"),
               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                minimumSize: const Size(double.infinity, 50),
               ),
             ),
           ],
