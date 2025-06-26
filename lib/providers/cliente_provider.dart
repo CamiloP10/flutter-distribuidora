@@ -7,6 +7,11 @@ class ClienteProvider with ChangeNotifier {
 
   List<Cliente> get clientes => _clientes;
 
+  Map<int, Cliente> get clientesMap => {
+    for (var c in _clientes)
+      if (c.id != null) c.id!: c
+  };
+
   Future<void> cargarClientes() async {
     _clientes = await DBHelper.obtenerClientes();
     notifyListeners();

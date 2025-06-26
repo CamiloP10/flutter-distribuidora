@@ -20,6 +20,13 @@ import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 
+int generarIdCortoUnico() {
+  final timestamp = DateTime.now().millisecondsSinceEpoch;
+  // Tomamos los últimos 8 dígitos del timestamp
+  final idStr = timestamp.toString().substring(timestamp.toString().length - 8);
+  return int.parse(idStr);
+}
+
 class CargueScreen extends StatefulWidget {
   const CargueScreen({super.key});
 
@@ -34,10 +41,20 @@ class _CargueScreenState extends State<CargueScreen> {
   final TextEditingController _observacionController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ventasProvider = Provider.of<VentasProvider>(context, listen: false);
+      ventasProvider.cargarDatos(); // 🔄 fuerza la recarga de facturas al entrar a esta pantalla
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final ventasProvider = Provider.of<VentasProvider>(context);
     final cargueProvider = Provider.of<CargueProvider>(context);
-    final facturas = ventasProvider.facturas;
+    final facturas = [...ventasProvider.facturas]
+      ..sort((a, b) => b.fecha.compareTo(a.fecha));
     final clientes = Provider.of<ClienteProvider>(context).clientes;
 
     String obtenerNombreCliente(int? clienteId) {
@@ -161,7 +178,7 @@ class _CargueScreenState extends State<CargueScreen> {
                             }
 
                             final nuevoCargue = Cargue(
-                              id: DateTime.now().millisecondsSinceEpoch,
+                              id: generarIdCortoUnico(),
                               vehiculoAsignado: vehiculoAsignado,
                               fecha: DateTime.now(),
                               facturaIds: facturasSeleccionadas.toList(),
@@ -174,11 +191,13 @@ class _CargueScreenState extends State<CargueScreen> {
                               await DBHelper.insertarCargue(nuevoCargue);
 
                               // 2. Generar PDF
+                              final clienteProvider = Provider.of<ClienteProvider>(context, listen: false);
                               final pdfBytes = await PdfGenerator.generarCarguePDF(
                                 cargue: nuevoCargue,
                                 facturas: ventasProvider.facturas,
                                 detalles: ventasProvider.getAllDetalles(),
                                 productos: ventasProvider.productosMap.values.toList(),
+                                clientes: clienteProvider.clientesMap,
                               );
 
                               // 3. Guardar archivo temporal y compartir
@@ -189,7 +208,7 @@ class _CargueScreenState extends State<CargueScreen> {
 
                               await Share.shareXFiles(
                                 [XFile(file.path)],
-                                text: 'Cargue #${nuevoCargue.id} generado desde la app.',
+                                text: 'Cargue #${nuevoCargue.id} ',
                               );
 
                               // 3. Cerrar diálogos y mostrar confirmación

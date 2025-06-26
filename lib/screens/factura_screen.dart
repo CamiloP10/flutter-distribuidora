@@ -273,7 +273,7 @@ class _FacturaScreenState extends State<FacturaScreen> {
 
     await Share.shareXFiles(
       [XFile(file.path)],
-      text: 'Factura #${factura.id} generada desde la app.',
+      text: 'MAYORISTA LA BELLEZA ®',
     );
   }
 

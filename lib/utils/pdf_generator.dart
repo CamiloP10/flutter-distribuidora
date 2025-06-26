@@ -96,7 +96,6 @@ class PdfGenerator {
           ),
           pw.SizedBox(height: 8),
           pw.Center(child: pw.Text('GRACIAS POR SU COMPRA', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))),
-          pw.Center(child: pw.Text('MAYORISTA LA BELLEZA ®', style: pw.TextStyle(fontSize: 9))),
         ],
       ),
     );
@@ -109,6 +108,7 @@ class PdfGenerator {
     required List<Factura> facturas,
     required List<DetalleFactura> detalles,
     required List<Producto> productos,
+    required Map<int, Cliente> clientes,
   }) async {
     final pdf = pw.Document();
     final formatFecha = DateFormat('yyyy-MM-dd HH:mm');
@@ -124,6 +124,8 @@ class PdfGenerator {
       0,
           (sum, f) => sum + f.total,
     );
+    final totalCredito = facturasCargue.fold<double>(0, (sum, f) => sum + f.saldoPendiente);
+    final totalPagado = facturasCargue.fold<double>(0, (sum, f) => sum + f.pagado);
 
     // 3. Filtrar detalles solo de esas facturas
     final detallesFiltrados = detalles
@@ -158,12 +160,22 @@ class PdfGenerator {
           pw.Divider(),
 
           pw.Text('Facturas asignadas:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
-          ...facturasCargue.map((f) =>
-              pw.Text('• Factura #${f.id} - \$${formatMiles.format(f.total)}', style: const pw.TextStyle(fontSize: 9))
-          ),
+          ...facturasCargue.map((f) {
+            final clienteNombre = clientes[f.clienteId ?? 0]?.nombre ?? 'NR';
+            return pw.Text(
+              'Fact. #${f.id} - $clienteNombre : \$${formatMiles.format(f.total)}',
+              style: const pw.TextStyle(fontSize: 9),
+            );
+          }),
+
           pw.SizedBox(height: 4),
           pw.Text('Total cargue: \$${formatMiles.format(totalCargue)}',
               style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+          pw.Text('Total efectivo: \$${formatMiles.format(totalPagado)}',
+              style: pw.TextStyle(fontSize: 9)),
+          pw.Text('Total crédito: \$${formatMiles.format(totalCredito)}',
+              style: pw.TextStyle(fontSize: 9)),
+
           pw.Divider(),
 
           pw.SizedBox(height: 6),
@@ -173,17 +185,46 @@ class PdfGenerator {
             final producto = productos.firstWhere(
                     (p) => p.id == entry.key,
                 orElse: () => Producto(
-                    id: 0,
-                    codigo: '',
-                    nombre: 'Producto desconocido',
-                    presentacion: '',
-                    cantidad: 0,
-                    precio: 0));
+                    id: 0, codigo: '', nombre: 'Producto desconocido',
+                    presentacion: '', cantidad: 0, precio: 0));
+
             final nombre = producto.presentacion.isNotEmpty
                 ? producto.presentacion
                 : producto.nombre;
-            return pw.Text('- $nombre: ${entry.value.toStringAsFixed(0)}',
-                style: const pw.TextStyle(fontSize: 9));
+
+            final cantidad = entry.value.toStringAsFixed(0);
+
+            return pw.Padding(
+              padding: const pw.EdgeInsets.symmetric(vertical: 4),
+              child: pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text('[  ]', style: const pw.TextStyle(fontSize: 10)),
+                  pw.SizedBox(width: 4), // Espacio entre el cuadro y el texto
+                  pw.Expanded(
+                    child: pw.RichText(
+                      text: pw.TextSpan(
+                        children: [
+                          pw.TextSpan(
+                            text: '(x$cantidad) ',
+                            style: pw.TextStyle(
+                              fontSize: 10,
+                              fontWeight: pw.FontWeight.bold,
+                            ),
+                          ),
+                          pw.TextSpan(
+                            text: nombre,
+                            style: pw.TextStyle(
+                              fontSize: 9,
+                              fontWeight: pw.FontWeight.normal,),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
           }),
 
           pw.Divider(),
@@ -215,8 +256,7 @@ class PdfGenerator {
   }
 }
 
-/*
-// ajustado a tamaño pdf A4 con multipage
+/* //ajustado a tamaño pdf A4 con multipage
 import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:pdf/widgets.dart' as pw;

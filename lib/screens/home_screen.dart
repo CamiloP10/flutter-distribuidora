@@ -8,6 +8,7 @@ import '../models/cliente.dart';
 import '../models/producto.dart';
 import 'factura_screen.dart';
 import 'cargue_screen.dart';
+import 'cargue_historial_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -93,7 +94,7 @@ class HomeScreen extends StatelessWidget {
             ),
             SizedBox(height: 20),
 
-            ElevatedButton.icon( // para cargues
+            ElevatedButton.icon( // para generar cargues
               onPressed: () {
                 Navigator.push(
                   context,
@@ -102,6 +103,21 @@ class HomeScreen extends StatelessWidget {
               },
               icon: Icon(Icons.fire_truck),
               label: Text('Asignar Cargue'),
+              style: ElevatedButton.styleFrom(
+                minimumSize: Size(double.infinity, 50),
+              ),
+            ),
+            SizedBox(height: 20),
+
+            ElevatedButton.icon( // para ver cargues
+              onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const CargueHistorialScreen()),
+                  );
+                },
+              icon: Icon(Icons.delivery_dining),
+              label: Text('Historial Cargues'),
               style: ElevatedButton.styleFrom(
                 minimumSize: Size(double.infinity, 50),
               ),
