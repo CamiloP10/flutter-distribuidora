@@ -1,17 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
-
 import '../models/cargue.dart';
 import '../providers/ventas_provider.dart';
 import '../providers/cliente_provider.dart';
 import '../utils/pdf_generator.dart';
-
 import 'dart:io';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
-
 
 class DetalleCargueScreen extends StatelessWidget {
   final Cargue cargue;
@@ -30,7 +26,6 @@ class DetalleCargueScreen extends StatelessWidget {
         .toList();
     final productos = ventasProvider.productosMap.values.toList();
     final clientes = clienteProvider.clientesMap;
-
     final format = DateFormat('dd/MM/yyyy HH:mm');
     return Scaffold(
       appBar: AppBar(title: Text('Cargue #${cargue.id}')),

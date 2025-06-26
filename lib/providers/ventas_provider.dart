@@ -12,7 +12,6 @@ class VentasProvider with ChangeNotifier {
   Map<int, List<DetalleFactura>> _detallesPorFactura = {};
 
   bool _cargando = false;
-
   bool get cargando => _cargando;
   List<Factura> get facturas => _facturas;
   Cliente? getCliente(int? id) => _clientes[id];
@@ -20,10 +19,8 @@ class VentasProvider with ChangeNotifier {
   List<DetalleFactura> getDetalles(int facturaId) => _detallesPorFactura[facturaId] ?? [];
   Map<int, Producto> get productosMap => _productos;
 
-    //prueba productos en pdf
   List<DetalleFactura> getAllDetalles() =>
       _detallesPorFactura.values.expand((d) => d).toList();
-
 
   Future<void> cargarDatos() async {
     _cargando = true;
@@ -41,7 +38,6 @@ class VentasProvider with ChangeNotifier {
       final detalles = await DBHelper.obtenerDetallesFactura(factura.id!);
       _detallesPorFactura[factura.id!] = detalles;
     }
-
     _cargando = false;
     notifyListeners();
   }

@@ -1,28 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import '../models/cargue.dart';
 import '../providers/cargue_provider.dart';
 import '../providers/ventas_provider.dart';
 import '../providers/cliente_provider.dart';
 import '../models/cliente.dart';
 import 'dart:io';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import 'package:path_provider/path_provider.dart';
 import '../db/db_helper.dart';
 import '../utils/pdf_generator.dart';
-
-import '../models/cargue.dart';
-
 import 'package:share_plus/share_plus.dart';
-import 'package:path_provider/path_provider.dart';
-import 'dart:io';
 
 int generarIdCortoUnico() {
   final timestamp = DateTime.now().millisecondsSinceEpoch;
-  // Tomamos los últimos 8 dígitos del timestamp
+  // Tomamos los últimos 8 dígitos del timestamp para el ID
   final idStr = timestamp.toString().substring(timestamp.toString().length - 8);
   return int.parse(idStr);
 }
@@ -45,14 +36,13 @@ class _CargueScreenState extends State<CargueScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final ventasProvider = Provider.of<VentasProvider>(context, listen: false);
-      ventasProvider.cargarDatos(); // 🔄 fuerza la recarga de facturas al entrar a esta pantalla
+      ventasProvider.cargarDatos(); //fuerza la recarga de facturas al entrar a esta pantalla
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final ventasProvider = Provider.of<VentasProvider>(context);
-    final cargueProvider = Provider.of<CargueProvider>(context);
     final facturas = [...ventasProvider.facturas]
       ..sort((a, b) => b.fecha.compareTo(a.fecha));
     final clientes = Provider.of<ClienteProvider>(context).clientes;
@@ -176,7 +166,6 @@ class _CargueScreenState extends State<CargueScreen> {
                               );
                               return;
                             }
-
                             final nuevoCargue = Cargue(
                               id: generarIdCortoUnico(),
                               vehiculoAsignado: vehiculoAsignado,
@@ -205,13 +194,12 @@ class _CargueScreenState extends State<CargueScreen> {
                               final file = File("${outputDir.path}/cargue_${nuevoCargue.id}.pdf");
 
                               await file.writeAsBytes(pdfBytes);
-
                               await Share.shareXFiles(
                                 [XFile(file.path)],
                                 text: 'Cargue #${nuevoCargue.id} ',
                               );
 
-                              // 3. Cerrar diálogos y mostrar confirmación
+                              // 4. Cerrar diálogos y mostrar confirmación
                               Navigator.of(context).pop(); // Cierra AlertDialog
                               Navigator.pop(context); // Regresa al home
 

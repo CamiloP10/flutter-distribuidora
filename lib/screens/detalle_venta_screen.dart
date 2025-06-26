@@ -1,8 +1,6 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
-
 import '../models/factura.dart';
 import '../models/detalle_factura.dart';
 import '../models/producto.dart';
@@ -46,7 +44,7 @@ class DetalleVentaScreen extends StatelessWidget {
               Text('Observaciones: ${factura.informacion}'),
             const Divider(),
 
-            // 🔘 Botón para generar PDF y compartir
+            // Botón para generar PDF y compartir
             Center(
               child: ElevatedButton.icon(
                 icon: const Icon(Icons.picture_as_pdf),
@@ -100,7 +98,6 @@ class DetalleVentaScreen extends StatelessWidget {
                         color: Colors.black87,
                       ),
                     ),
-
                   );
                 },
               ),

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import '../models/cliente.dart';
 import '../providers/cliente_provider.dart';
 
@@ -60,4 +59,3 @@ class _AgregarClienteScreenState extends State<AgregarClienteScreen> {
     );
   }
 }
-

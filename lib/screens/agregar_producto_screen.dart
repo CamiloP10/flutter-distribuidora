@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import '../models/producto.dart';
 import '../providers/producto_provider.dart';
 
@@ -81,4 +80,3 @@ class _AgregarProductoScreenState extends State<AgregarProductoScreen> {
     );
   }
 }
-

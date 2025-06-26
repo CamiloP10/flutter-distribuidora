@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-
 import '../providers/ventas_provider.dart';
 import '../screens/detalle_venta_screen.dart';
-import '../models/factura.dart';
 import '../models/cliente.dart';
 import '../models/producto.dart';
 
@@ -36,7 +34,6 @@ class _VentasScreenState extends State<VentasScreen> {
         body: Center(child: CircularProgressIndicator()),
       );
     }
-
     final facturas = ventasProvider.facturas;
 
     return Scaffold(
@@ -70,5 +67,3 @@ class _VentasScreenState extends State<VentasScreen> {
     );
   }
 }
-
-

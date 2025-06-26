@@ -20,7 +20,6 @@ class InitProvider with ChangeNotifier {
     } catch (e) {
       print('Error durante inicialización: $e');
     }
-
     _isLoading = false;
     notifyListeners();
   }

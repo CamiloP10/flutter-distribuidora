@@ -154,7 +154,6 @@ class DBHelper {
     }
   }
 
-
   // IMPORTAR INVENTARIO
   static Future<void> importarInventarioDesdeCSV() async {
     final prefs = await SharedPreferences.getInstance();
@@ -212,9 +211,7 @@ class DBHelper {
 
     // 1. Consultar todos los registros de cargue
     final cargueMaps = await db.query('cargue');
-
     List<Cargue> cargues = [];
-
     for (final map in cargueMaps) {
       final cargueId = map['id'] as int;
 
@@ -224,9 +221,7 @@ class DBHelper {
         where: 'cargueId = ?',
         whereArgs: [cargueId],
       );
-
       final facturaIds = facturaMaps.map<int>((f) => f['facturaId'] as int).toList();
-
       final cargue = Cargue(
         id: cargueId,
         vehiculoAsignado: map['vehiculo'] as String,
@@ -235,13 +230,8 @@ class DBHelper {
         observaciones: (map['observaciones'] ?? '') as String,
         facturaIds: facturaIds,
       );
-
       cargues.add(cargue);
     }
-
     return cargues;
   }
-
-
-
 }

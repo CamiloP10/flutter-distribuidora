@@ -1,24 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import 'providers/init_provider.dart';
 import 'providers/producto_provider.dart';
 import 'providers/cliente_provider.dart';
-
 import 'screens/home_screen.dart';
 import 'screens/agregar_producto_screen.dart';
 import 'screens/agregar_cliente_screen.dart';
-
 import 'providers/ventas_provider.dart';
 import 'providers/cargue_provider.dart';
-import 'providers/cargue_provider.dart';
-
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const AppWithProviders());
 }
-
 
 class AppWithProviders extends StatelessWidget {
   const AppWithProviders({super.key});
@@ -84,5 +78,3 @@ class AppInitializer extends StatelessWidget {
     return const HomeScreen();
   }
 }
-
-

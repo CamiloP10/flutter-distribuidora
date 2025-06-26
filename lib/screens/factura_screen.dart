@@ -6,9 +6,6 @@ import '../models/factura.dart';
 import '../db/db_helper.dart';
 import 'package:intl/intl.dart';
 import '../utils/pdf_generator.dart';
-import 'package:printing/printing.dart';
-import 'package:pdf/pdf.dart';
-//para compartir en lugar de mostrar pdf
 import 'dart:io';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
@@ -28,7 +25,6 @@ class _FacturaScreenState extends State<FacturaScreen> {
   final List<DetalleFactura> detalles = [];
   final List<TextEditingController> cantidadControllers = [];
   final List<TextEditingController> precioControllers = [];
-
   final TextEditingController clienteBusquedaController = TextEditingController();
   final TextEditingController productoBusquedaController = TextEditingController();
   final NumberFormat currencyFormat = NumberFormat('#,##0', 'es_CO');
@@ -241,7 +237,6 @@ class _FacturaScreenState extends State<FacturaScreen> {
                       clienteBusquedaController.clear();
                       productoBusquedaController.clear();
                     });
-
                   },
                   child: const Text('Confirmar'),
                 ),
