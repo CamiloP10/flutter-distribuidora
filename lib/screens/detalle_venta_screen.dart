@@ -50,7 +50,7 @@ class DetalleVentaScreen extends StatelessWidget {
                 icon: const Icon(Icons.picture_as_pdf),
                 label: const Text('Generar PDF'),
                 onPressed: () async {
-                  final clienteFinal = cliente ?? Cliente(id: 0, nombre: 'Cliente eliminado', telefono: '', informacion: '');
+                  final clienteFinal = cliente ?? Cliente(id: 0, nombre: 'NR', telefono: '', informacion: '');
                   final pdfBytes = await PdfGenerator.generarFacturaPDF(
                     factura: factura,
                     cliente: clienteFinal,

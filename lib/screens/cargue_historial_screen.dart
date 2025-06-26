@@ -22,6 +22,8 @@ class _CargueHistorialScreenState extends State<CargueHistorialScreen> {
 
   Future<void> cargarCargues() async {
     final lista = await DBHelper.obtenerCargues();
+    // Ordenar por fecha descendente
+    lista.sort((a, b) => b.fecha.compareTo(a.fecha));
     setState(() {
       cargues = lista;
     });

@@ -25,23 +25,16 @@ class HomeScreen extends StatelessWidget {
 
             // prueba icon para crear facturas
             ElevatedButton.icon(
-              onPressed: () async {
-                final clientes = await DBHelper.obtenerClientes();
-                final productos = await DBHelper.obtenerProductos();
+              onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(
-                      builder: (context) => FacturaScreen(
-                        clientes: clientes,
-                        productos: productos,
-                      )
-                  ),
+                  MaterialPageRoute(builder: (context) => const FacturaScreen()),
                 );
               },
-              icon: Icon(Icons.receipt_long),
-              label: Text('Crear Factura'),
+              icon: const Icon(Icons.receipt_long),
+              label: const Text('Crear Factura'),
               style: ElevatedButton.styleFrom(
-                minimumSize: Size(double.infinity, 50),
+                minimumSize: const Size(double.infinity, 50),
               ),
             ),
             SizedBox(height: 20),
