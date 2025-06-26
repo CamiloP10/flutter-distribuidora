@@ -11,12 +11,14 @@ import 'screens/agregar_cliente_screen.dart';
 
 import 'providers/ventas_provider.dart';
 import 'providers/cargue_provider.dart';
+import 'providers/cargue_provider.dart';
 
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const AppWithProviders());
 }
+
 
 class AppWithProviders extends StatelessWidget {
   const AppWithProviders({super.key});
@@ -76,6 +78,7 @@ class AppInitializer extends StatelessWidget {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<ProductoProvider>(context, listen: false).cargarProductos();
       Provider.of<ClienteProvider>(context, listen: false).cargarClientes();
+      Provider.of<VentasProvider>(context, listen: false).cargarDatos();
     });
 
     return const HomeScreen();

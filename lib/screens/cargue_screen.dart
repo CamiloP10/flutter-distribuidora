@@ -6,6 +6,23 @@ import '../providers/cargue_provider.dart';
 import '../providers/ventas_provider.dart';
 import '../providers/cliente_provider.dart';
 import '../models/cliente.dart';
+import 'dart:io';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:path_provider/path_provider.dart';
+import '../db/db_helper.dart';
+import '../utils/pdf_generator.dart';
+
+
+import '../models/cargue.dart';
+
+
+import 'package:share_plus/share_plus.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
+
+
 
 
 
@@ -140,8 +157,9 @@ class _CargueScreenState extends State<CargueScreen> {
                           child: const Text("Cancelar"),
                         ),
                         ElevatedButton(
-                          onPressed: () {
+                          onPressed: () async {
                             final conductor = _conductorController.text.trim();
+
                             if (conductor.isEmpty) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text("El nombre del conductor es obligatorio")),
@@ -151,23 +169,52 @@ class _CargueScreenState extends State<CargueScreen> {
 
                             final nuevoCargue = Cargue(
                               id: DateTime.now().millisecondsSinceEpoch,
-                              vehiculoAsignado: vehiculoAsignado, // ahora representa el vehículo
+                              vehiculoAsignado: vehiculoAsignado,
                               fecha: DateTime.now(),
                               facturaIds: facturasSeleccionadas.toList(),
                               conductor: conductor,
                               observaciones: _observacionController.text.trim(),
                             );
 
+                            try {
+                              // 1. Guardar en la base de datos
+                              await DBHelper.insertarCargue(nuevoCargue);
 
-                            cargueProvider.agregarCargue(nuevoCargue);
+                              // 2. Generar PDF
+                              //final pdfBytes = await PdfGenerator.generarCarguePDF(cargue: nuevoCargue);
+                              final pdfBytes = await PdfGenerator.generarCarguePDF(//prueba productos completos en pdf
+                                cargue: nuevoCargue,
+                                facturas: ventasProvider.facturas,
+                                detalles: ventasProvider.getAllDetalles(),
+                                productos: ventasProvider.productosMap.values.toList(),
+                              );
 
-                            Navigator.of(context).pop(); // cerrar diálogo
-                            Navigator.pop(context); // volver atrás
+                              // 3. Guardar archivo temporal y compartir
+                              final outputDir = await getTemporaryDirectory();
+                              final file = File("${outputDir.path}/cargue_${nuevoCargue.id}.pdf");
 
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text("Cargue generado exitosamente")),
-                            );
+                              await file.writeAsBytes(pdfBytes);
+
+                              await Share.shareXFiles(
+                                [XFile(file.path)],
+                                text: 'Cargue #${nuevoCargue.id} generado desde la app.',
+                              );
+
+
+                              // 3. Cerrar diálogos y mostrar confirmación
+                              Navigator.of(context).pop(); // Cierra AlertDialog
+                              Navigator.pop(context); // Regresa al home
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("Cargue generado y compartido con éxito")),
+                              );
+                            } catch (e) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text("Error al guardar el cargue: $e")),
+                              );
+                            }
                           },
+
                           child: const Text("Confirmar"),
                         ),
                       ],

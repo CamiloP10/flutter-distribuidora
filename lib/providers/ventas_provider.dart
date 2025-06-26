@@ -20,6 +20,11 @@ class VentasProvider with ChangeNotifier {
   List<DetalleFactura> getDetalles(int facturaId) => _detallesPorFactura[facturaId] ?? [];
   Map<int, Producto> get productosMap => _productos;
 
+    //prueba productos en pdf
+  List<DetalleFactura> getAllDetalles() =>
+      _detallesPorFactura.values.expand((d) => d).toList();
+
+
   Future<void> cargarDatos() async {
     _cargando = true;
     notifyListeners();

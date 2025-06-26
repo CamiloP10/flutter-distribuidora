@@ -10,6 +10,7 @@ import '../models/factura.dart';
 import '../models/detalle_factura.dart';
 import '../models/producto.dart';
 import '../models/cliente.dart';
+import '../models/cargue.dart';
 
 class PdfGenerator {
   static Future<Uint8List> generarFacturaPDF({
@@ -101,6 +102,145 @@ class PdfGenerator {
     );
     return pdf.save();
   }
+
+  /*static Future<Uint8List> generarCarguePDF({
+    required Cargue cargue,
+  }) async {
+    final pdf = pw.Document();
+    final formatFecha = DateFormat('yyyy-MM-dd HH:mm');
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat(58 * PdfPageFormat.mm, PdfPageFormat.a4.height),
+        margin: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+        build: (context) => [
+          pw.Center(
+            child: pw.Text(
+              'CARGUE DE PEDIDOS',
+              style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+            ),
+          ),
+          pw.SizedBox(height: 6),
+          pw.Text('Vehículo: ${cargue.vehiculoAsignado}', style: const pw.TextStyle(fontSize: 9)),
+          pw.Text('Conductor: ${cargue.conductor}', style: const pw.TextStyle(fontSize: 9)),
+          pw.Text('Fecha: ${formatFecha.format(cargue.fecha)}', style: const pw.TextStyle(fontSize: 9)),
+          if (cargue.observaciones.isNotEmpty)
+            pw.Text('Obs: ${cargue.observaciones}', style: const pw.TextStyle(fontSize: 9)),
+          pw.SizedBox(height: 6),
+          pw.Divider(),
+          pw.Text('Facturas asignadas:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
+          pw.SizedBox(height: 4),
+          ...cargue.facturaIds.map(
+                (id) => pw.Text('• Factura #$id', style: const pw.TextStyle(fontSize: 9)),
+          ),
+          pw.Divider(),
+          pw.SizedBox(height: 6),
+          pw.Center(
+            child: pw.Text('FIN DEL CARGUE', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    return pdf.save();
+  }*/
+
+  // prueba productos en pdf
+  static Future<Uint8List> generarCarguePDF({
+    required Cargue cargue,
+    required List<Factura> facturas,
+    required List<DetalleFactura> detalles,
+    required List<Producto> productos,
+  }) async {
+    final pdf = pw.Document();
+    final formatFecha = DateFormat('yyyy-MM-dd HH:mm');
+    final formatMiles = NumberFormat('#,###', 'es_CO');
+
+    // 1. Filtrar solo las facturas seleccionadas en el cargue
+    final facturasCargue = facturas
+        .where((f) => cargue.facturaIds.contains(f.id))
+        .toList();
+
+    // 2. Calcular total general del cargue
+    final totalCargue = facturasCargue.fold<double>(
+      0,
+          (sum, f) => sum + f.total,
+    );
+
+    // 3. Filtrar detalles solo de esas facturas
+    final detallesFiltrados = detalles
+        .where((d) => cargue.facturaIds.contains(d.facturaId))
+        .toList();
+
+    // 4. Agrupar productos por productoId
+    final Map<int, double> cantidadPorProducto = {};
+    for (final d in detallesFiltrados) {
+      cantidadPorProducto[d.productoId] =
+          (cantidadPorProducto[d.productoId] ?? 0) + d.cantidad;
+    }
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat(58 * PdfPageFormat.mm, PdfPageFormat.a4.height),
+        margin: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+        build: (context) => [
+          pw.Center(
+            child: pw.Text(
+              'CARGUE DE PEDIDOS',
+              style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+            ),
+          ),
+          pw.SizedBox(height: 6),
+          pw.Text('Vehículo: ${cargue.vehiculoAsignado}', style: const pw.TextStyle(fontSize: 9)),
+          pw.Text('Conductor: ${cargue.conductor}', style: const pw.TextStyle(fontSize: 9)),
+          pw.Text('Fecha: ${formatFecha.format(cargue.fecha)}', style: const pw.TextStyle(fontSize: 9)),
+          if (cargue.observaciones.isNotEmpty)
+            pw.Text('Obs: ${cargue.observaciones}', style: const pw.TextStyle(fontSize: 9)),
+          pw.SizedBox(height: 6),
+          pw.Divider(),
+
+          pw.Text('Facturas asignadas:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
+          ...facturasCargue.map((f) =>
+              pw.Text('• Factura #${f.id} - \$${formatMiles.format(f.total)}', style: const pw.TextStyle(fontSize: 9))
+          ),
+          pw.SizedBox(height: 4),
+          pw.Text('Total cargue: \$${formatMiles.format(totalCargue)}',
+              style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+          pw.Divider(),
+
+          pw.SizedBox(height: 6),
+          pw.Text('Resumen de productos:',
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
+          ...cantidadPorProducto.entries.map((entry) {
+            final producto = productos.firstWhere(
+                    (p) => p.id == entry.key,
+                orElse: () => Producto(
+                    id: 0,
+                    codigo: '',
+                    nombre: 'Producto desconocido',
+                    presentacion: '',
+                    cantidad: 0,
+                    precio: 0));
+            final nombre = producto.presentacion.isNotEmpty
+                ? producto.presentacion
+                : producto.nombre;
+            return pw.Text('- $nombre: ${entry.value.toStringAsFixed(0)}',
+                style: const pw.TextStyle(fontSize: 9));
+          }),
+
+          pw.Divider(),
+          pw.Center(
+            child: pw.Text('FIN DEL CARGUE',
+                style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    return pdf.save();
+  }
+
+
 
   static Future<pw.ImageProvider> _cargarLogo() async {
     final data = await rootBundle.load('assets/icon.png');

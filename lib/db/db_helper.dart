@@ -7,6 +7,7 @@ import '../models/producto.dart';
 import '../models/cliente.dart';
 import '../models/factura.dart';
 import '../models/detalle_factura.dart';
+import '../models/cargue.dart';
 
 class DBHelper {
   static Database? _db;
@@ -63,6 +64,24 @@ class DBHelper {
         precioModificado REAL
       )
     ''');
+    await db.execute('''
+      CREATE TABLE cargue (
+        id INTEGER PRIMARY KEY,
+        vehiculo TEXT,
+        fecha TEXT,
+        conductor TEXT,
+        observaciones TEXT
+  )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE cargue_factura (
+        cargueId INTEGER,
+        facturaId INTEGER,
+        FOREIGN KEY (cargueId) REFERENCES cargue(id),
+        FOREIGN KEY (facturaId) REFERENCES factura(id)
+  )
+    ''');
   }
 
   // PRODUCTOS
@@ -115,9 +134,31 @@ class DBHelper {
     return maps.map((e) => DetalleFactura.fromMap(e)).toList();
   }
 
+  // para los cargues
+  static Future<void> insertarCargue(Cargue cargue) async {
+    final db = await initDb();
+
+    await db.insert('cargue', {
+      'id': cargue.id,
+      'vehiculo': cargue.vehiculoAsignado,
+      'fecha': cargue.fecha.toIso8601String(),
+      'conductor': cargue.conductor,
+      'observaciones': cargue.observaciones,
+    });
+
+    for (final facturaId in cargue.facturaIds) {
+      await db.insert('cargue_factura', {
+        'cargueId': cargue.id,
+        'facturaId': facturaId,
+      });
+    }
+  }
+
+
   // IMPORTAR INVENTARIO
   static Future<void> importarInventarioDesdeCSV() async {
     final prefs = await SharedPreferences.getInstance();
+    //await prefs.remove('inventario_cargado');//fuerza a cargar, SOLO PARA DESARROLLO (comenta esto después de que cargue bien)
     final yaImportado = prefs.getBool('inventario_cargado') ?? false;
     if (yaImportado) return;
 
@@ -144,6 +185,7 @@ class DBHelper {
   // IMPORTAR CLIENTES
   static Future<void> importarClientesDesdeCSV() async {
     final prefs = await SharedPreferences.getInstance();
+    //await prefs.remove('clientes_cargados');//fuerza a cargar la db SOLO PARA DESARROLLO (comenta esto después de que cargue bien)
     final yaImportado = prefs.getBool('clientes_cargados') ?? false;
     if (yaImportado) return;
 
