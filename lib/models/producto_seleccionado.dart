@@ -13,8 +13,6 @@ class ProductoSeleccionado {
   }) : this.precioModificado = precioModificado ?? producto.precio;
 
   double get precioOriginal => producto.precio;
-
   double get subtotal => cantidad * precioModificado;
-
   int get productoId => producto.id!;
 }

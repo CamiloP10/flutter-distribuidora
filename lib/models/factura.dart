@@ -5,9 +5,9 @@ class Factura {
   final DateTime fecha;
   final double total;
   final double pagado;
-  final double saldoPendiente; // <- nuevo campo
+  final double saldoPendiente;
   final String tipoPago;
-  final String estadoPago;     // <- nuevo campo
+  final String estadoPago;
   final String informacion;
 
   Factura({
@@ -77,6 +77,3 @@ class Factura {
     );
   }
 }
-
-
-

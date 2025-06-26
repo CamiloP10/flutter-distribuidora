@@ -14,17 +14,11 @@ import 'package:path_provider/path_provider.dart';
 import '../db/db_helper.dart';
 import '../utils/pdf_generator.dart';
 
-
 import '../models/cargue.dart';
-
 
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
-
-
-
-
 
 class CargueScreen extends StatefulWidget {
   const CargueScreen({super.key});
@@ -109,7 +103,6 @@ class _CargueScreenState extends State<CargueScreen> {
                         }
                       });
                     },
-                    // Ajusta esta línea según tu modelo:
                     title: Text("Factura #${idFactura} - ${obtenerNombreCliente(factura.clienteId)}"),
                     subtitle: Text(
                       "${factura.fecha.toString().substring(0, 16)} - Total: \$${factura.total.toStringAsFixed(0)}",
@@ -181,8 +174,7 @@ class _CargueScreenState extends State<CargueScreen> {
                               await DBHelper.insertarCargue(nuevoCargue);
 
                               // 2. Generar PDF
-                              //final pdfBytes = await PdfGenerator.generarCarguePDF(cargue: nuevoCargue);
-                              final pdfBytes = await PdfGenerator.generarCarguePDF(//prueba productos completos en pdf
+                              final pdfBytes = await PdfGenerator.generarCarguePDF(
                                 cargue: nuevoCargue,
                                 facturas: ventasProvider.facturas,
                                 detalles: ventasProvider.getAllDetalles(),
@@ -199,7 +191,6 @@ class _CargueScreenState extends State<CargueScreen> {
                                 [XFile(file.path)],
                                 text: 'Cargue #${nuevoCargue.id} generado desde la app.',
                               );
-
 
                               // 3. Cerrar diálogos y mostrar confirmación
                               Navigator.of(context).pop(); // Cierra AlertDialog
@@ -235,5 +226,3 @@ class _CargueScreenState extends State<CargueScreen> {
     );
   }
 }
-
-

@@ -103,49 +103,7 @@ class PdfGenerator {
     return pdf.save();
   }
 
-  /*static Future<Uint8List> generarCarguePDF({
-    required Cargue cargue,
-  }) async {
-    final pdf = pw.Document();
-    final formatFecha = DateFormat('yyyy-MM-dd HH:mm');
-
-    pdf.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat(58 * PdfPageFormat.mm, PdfPageFormat.a4.height),
-        margin: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 10),
-        build: (context) => [
-          pw.Center(
-            child: pw.Text(
-              'CARGUE DE PEDIDOS',
-              style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
-            ),
-          ),
-          pw.SizedBox(height: 6),
-          pw.Text('Vehículo: ${cargue.vehiculoAsignado}', style: const pw.TextStyle(fontSize: 9)),
-          pw.Text('Conductor: ${cargue.conductor}', style: const pw.TextStyle(fontSize: 9)),
-          pw.Text('Fecha: ${formatFecha.format(cargue.fecha)}', style: const pw.TextStyle(fontSize: 9)),
-          if (cargue.observaciones.isNotEmpty)
-            pw.Text('Obs: ${cargue.observaciones}', style: const pw.TextStyle(fontSize: 9)),
-          pw.SizedBox(height: 6),
-          pw.Divider(),
-          pw.Text('Facturas asignadas:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
-          pw.SizedBox(height: 4),
-          ...cargue.facturaIds.map(
-                (id) => pw.Text('• Factura #$id', style: const pw.TextStyle(fontSize: 9)),
-          ),
-          pw.Divider(),
-          pw.SizedBox(height: 6),
-          pw.Center(
-            child: pw.Text('FIN DEL CARGUE', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-
-    return pdf.save();
-  }*/
-
-  // prueba productos en pdf
+  // Cargue en pdf
   static Future<Uint8List> generarCarguePDF({
     required Cargue cargue,
     required List<Factura> facturas,
@@ -240,8 +198,6 @@ class PdfGenerator {
     return pdf.save();
   }
 
-
-
   static Future<pw.ImageProvider> _cargarLogo() async {
     final data = await rootBundle.load('assets/icon.png');
     final bytes = data.buffer.asUint8List();
@@ -258,7 +214,6 @@ class PdfGenerator {
     return numero % 1 == 0 ? numero.toInt().toString() : numero.toString();
   }
 }
-//*/
 
 /*
 // ajustado a tamaño pdf A4 con multipage

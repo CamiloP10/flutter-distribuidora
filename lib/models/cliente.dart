@@ -1,4 +1,3 @@
-// lib/models/cliente.dart
 class Cliente {
   int? id;
   String nombre;

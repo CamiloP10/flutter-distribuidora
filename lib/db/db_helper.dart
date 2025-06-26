@@ -158,7 +158,6 @@ class DBHelper {
   // IMPORTAR INVENTARIO
   static Future<void> importarInventarioDesdeCSV() async {
     final prefs = await SharedPreferences.getInstance();
-    //await prefs.remove('inventario_cargado');//fuerza a cargar, SOLO PARA DESARROLLO (comenta esto después de que cargue bien)
     final yaImportado = prefs.getBool('inventario_cargado') ?? false;
     if (yaImportado) return;
 

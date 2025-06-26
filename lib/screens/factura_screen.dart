@@ -73,7 +73,6 @@ class _FacturaScreenState extends State<FacturaScreen> {
     });
   }
 
-
   void filtrarProductos(String query) {
     final q = query.toLowerCase();
     if (q.isEmpty) {
@@ -198,7 +197,6 @@ class _FacturaScreenState extends State<FacturaScreen> {
                     final estado = saldo <= 0 ? 'Pagado' : 'Crédito';
                     final tipoGuardado = tipoPagoSeleccionado == 'Pago total' ? 'Contado' : 'Crédito';
 
-
                     final factura = Factura(
                       clienteId: clienteSeleccionado?.id,
                       fecha: DateTime.now(),
@@ -226,13 +224,6 @@ class _FacturaScreenState extends State<FacturaScreen> {
                       const SnackBar(content: Text('Factura registrada correctamente.')),
                     );
 
-                    //Genera y muestra el PDF
-                    /*await generarYMostrarPDF(
-                      factura: factura,
-                      cliente: cliente,
-                      detalles: detalles,
-                      productos: widget.productos,
-                    );*/
                     //Genera y comparte el PDF
                     await generarYCompartirPDF(
                       factura: facturaConId,
@@ -262,24 +253,6 @@ class _FacturaScreenState extends State<FacturaScreen> {
     );
   }
 
-  /*Future<void> generarYMostrarPDF({
-    required Factura factura,
-    required Cliente? cliente,
-    required List<DetalleFactura> detalles,
-    required List<Producto> productos,
-  }) async {
-    final pdfBytes = await PdfGenerator.generarFacturaPDF(
-      factura: factura,
-      cliente: cliente,
-      detalles: detalles,
-      productos: productos,
-    );
-
-    await Printing.layoutPdf(
-      onLayout: (PdfPageFormat format) async => pdfBytes,
-    );
-  }*/
-
   Future<void> generarYCompartirPDF({
     required Factura factura,
     required Cliente? cliente,
@@ -303,7 +276,6 @@ class _FacturaScreenState extends State<FacturaScreen> {
       text: 'Factura #${factura.id} generada desde la app.',
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -431,7 +403,6 @@ class _FacturaScreenState extends State<FacturaScreen> {
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-
                             // Cantidad
                             Expanded(
                               child: Column(
@@ -512,7 +483,6 @@ class _FacturaScreenState extends State<FacturaScreen> {
                                     ],
                                   ),
                                 );
-
                                 if (confirmar == true) {
                                   setState(() {
                                     detalles.removeAt(index);
@@ -522,7 +492,6 @@ class _FacturaScreenState extends State<FacturaScreen> {
                                 }
                               },
                             ),
-
                           ],
                         ),
                       ],

@@ -78,7 +78,6 @@ class HomeScreen extends StatelessWidget {
             ),
             SizedBox(height: 20),
 
-
             ElevatedButton.icon(//para clientes
               onPressed: () {
                 Navigator.push(
@@ -93,7 +92,6 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
             SizedBox(height: 20),
-
 
             ElevatedButton.icon( // para cargues
               onPressed: () {
@@ -114,4 +112,3 @@ class HomeScreen extends StatelessWidget {
     );
   }
 }
-

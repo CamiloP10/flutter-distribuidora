@@ -113,5 +113,4 @@ class DetalleVentaScreen extends StatelessWidget {
   String formatearCantidad(double cantidad) {
     return cantidad % 1 == 0 ? cantidad.toInt().toString() : cantidad.toString();
   }
-
 }

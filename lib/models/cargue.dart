@@ -1,4 +1,3 @@
-// models/cargue.dart
 class Cargue {
   final int id;
   final String vehiculoAsignado;
@@ -15,6 +14,5 @@ class Cargue {
     required this.conductor,
     required this.observaciones,
   });
-
-// Métodos de conversión para SQLite si lo deseas almacenar
+// Métodos de conversión para SQLite
 }
