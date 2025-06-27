@@ -21,5 +21,10 @@ class ClienteProvider with ChangeNotifier {
     await DBHelper.insertarCliente(cliente);
     await cargarClientes(); // Vuelve a cargar la lista desde la DB
   }
-  //añadir mas funciones para eliminar, buscar
+
+  void agregarClienteEnMemoria(Cliente clienteConId) {
+    _clientes.add(clienteConId);
+    notifyListeners();
+  }
+//añadir mas funciones para eliminar, buscar
 }

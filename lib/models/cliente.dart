@@ -27,6 +27,21 @@ class Cliente {
       'informacion': informacion,
     };
   }
+
+  //Metodo para copiar el objeto con valores modificados (como el id)
+  Cliente copyWith({
+    int? id,
+    String? nombre,
+    String? telefono,
+    String? informacion,
+  }) {
+    return Cliente(
+      id: id ?? this.id,
+      nombre: nombre ?? this.nombre,
+      telefono: telefono ?? this.telefono,
+      informacion: informacion ?? this.informacion,
+    );
+  }
 }
 
 
