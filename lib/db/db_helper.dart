@@ -234,4 +234,37 @@ class DBHelper {
     }
     return cargues;
   }
+
+  static Future<void> actualizarCargue(Cargue cargue) async {
+    final db = await initDb();
+
+    // 1. Actualizar los datos del cargue
+    await db.update(
+      'cargue',
+      {
+        'vehiculo': cargue.vehiculoAsignado,
+        'fecha': cargue.fecha.toIso8601String(),
+        'conductor': cargue.conductor,
+        'observaciones': cargue.observaciones,
+      },
+      where: 'id = ?',
+      whereArgs: [cargue.id],
+    );
+
+    // 2. Eliminar las facturas anteriores asociadas
+    await db.delete(
+      'cargue_factura',
+      where: 'cargueId = ?',
+      whereArgs: [cargue.id],
+    );
+
+    // 3. Insertar las nuevas facturas asociadas
+    for (final facturaId in cargue.facturaIds) {
+      await db.insert('cargue_factura', {
+        'cargueId': cargue.id,
+        'facturaId': facturaId,
+      });
+    }
+  }
+
 }

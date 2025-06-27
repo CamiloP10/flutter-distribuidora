@@ -4,6 +4,8 @@ import '../models/cliente.dart';
 import '../models/producto.dart';
 import '../models/detalle_factura.dart';
 import '../db/db_helper.dart';
+import '../models/cargue.dart';
+
 
 class VentasProvider with ChangeNotifier {
   List<Factura> _facturas = [];
@@ -21,6 +23,15 @@ class VentasProvider with ChangeNotifier {
 
   List<DetalleFactura> getAllDetalles() =>
       _detallesPorFactura.values.expand((d) => d).toList();
+
+  List<Cargue> _cargues = [];
+  List<Cargue> get cargues => _cargues;
+
+  Future<void> cargarCargues() async {
+    _cargues = await DBHelper.obtenerCargues();
+    notifyListeners();
+  }
+
 
   Future<void> cargarDatos() async {
     _cargando = true;
@@ -40,6 +51,11 @@ class VentasProvider with ChangeNotifier {
     }
     _cargando = false;
     notifyListeners();
+  }
+
+  Future<void> actualizarCargue(Cargue nuevoCargue) async {
+    await DBHelper.actualizarCargue(nuevoCargue);
+    await cargarCargues(); // O actualiza solo este cargue si prefieres
   }
 
   void limpiar() {

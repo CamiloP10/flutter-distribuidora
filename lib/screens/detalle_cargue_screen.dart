@@ -27,6 +27,7 @@ class DetalleCargueScreen extends StatelessWidget {
     final productos = ventasProvider.productosMap.values.toList();
     final clientes = clienteProvider.clientesMap;
     final format = DateFormat('dd/MM/yyyy HH:mm');
+
     return Scaffold(
       appBar: AppBar(title: Text('Cargue #${cargue.id}')),
       body: Padding(
@@ -62,9 +63,18 @@ class DetalleCargueScreen extends StatelessWidget {
                     [XFile(file.path)],
                     text: 'Cargue #${cargue.id}',
                   );
-                  //await Printing.sharePdf(bytes: pdf, filename: 'Cargue_${cargue.id}.pdf');
                 },
               ),
+            ),
+
+            const SizedBox(height: 10),
+
+            ElevatedButton.icon(
+              icon: const Icon(Icons.add),
+              label: const Text('Agregar Factura'),
+              onPressed: () async {
+                await mostrarDialogoSeleccionFacturas(context, cargue);
+              },
             ),
 
             const SizedBox(height: 10),
@@ -87,4 +97,73 @@ class DetalleCargueScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<void> mostrarDialogoSeleccionFacturas(BuildContext context, Cargue cargue) async {
+  final ventasProvider = Provider.of<VentasProvider>(context, listen: false);
+  final facturasDisponibles = ventasProvider.facturas
+      .where((f) => !cargue.facturaIds.contains(f.id))
+      .toList();
+
+  List<int> seleccionadas = [];
+
+  await showDialog(
+    context: context,
+    builder: (_) {
+      return AlertDialog(
+        title: Text('Seleccionar Facturas'),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 300,
+          child: ListView.builder(
+            itemCount: facturasDisponibles.length,
+            itemBuilder: (context, index) {
+              final f = facturasDisponibles[index];
+              return StatefulBuilder(
+                builder: (context, setState) => CheckboxListTile(
+                  title: Text('Factura #${f.id} - \$${f.total.toStringAsFixed(0)}'),
+                  subtitle: Text(DateFormat('dd/MM/yyyy').format(f.fecha)),
+                  value: seleccionadas.contains(f.id),
+                  onChanged: (val) {
+                    setState(() {
+                      if (val == true) {
+                        seleccionadas.add(f.id!);
+                      } else {
+                        seleccionadas.remove(f.id);
+                      }
+                    });
+                  },
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (seleccionadas.isNotEmpty) {
+                final nuevasFacturas = List<int>.from(cargue.facturaIds)..addAll(seleccionadas);
+                final nuevoCargue = cargue.copyWith(facturaIds: nuevasFacturas.toSet().toList());
+                await ventasProvider.actualizarCargue(nuevoCargue);
+
+                Navigator.pop(context);
+
+                // Refrescar vista
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => DetalleCargueScreen(cargue: nuevoCargue)),
+                );
+              }
+            },
+            child: const Text('Guardar'),
+          ),
+        ],
+      );
+    },
+  );
 }

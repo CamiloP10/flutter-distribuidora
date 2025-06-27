@@ -21,6 +21,7 @@ class FacturaScreen extends StatefulWidget {
 }
 
 class _FacturaScreenState extends State<FacturaScreen> {
+
   Cliente? clienteSeleccionado;
   final List<DetalleFactura> detalles = [];
   final List<TextEditingController> cantidadControllers = [];
@@ -153,6 +154,7 @@ class _FacturaScreenState extends State<FacturaScreen> {
     String? tipoPagoSeleccionado;
     final pagoCtrl = TextEditingController();
     final obsCtrl = TextEditingController();
+    bool botonDeshabilitado = false;
 
     // Validar cliente antes de continuar
     if (clienteSeleccionado == null || clienteSeleccionado!.id == null) {
@@ -221,7 +223,6 @@ class _FacturaScreenState extends State<FacturaScreen> {
       }
     }
 
-
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -269,23 +270,35 @@ class _FacturaScreenState extends State<FacturaScreen> {
                   onPressed: () => Navigator.pop(context),
                   child: const Text('Cancelar'),
                 ),
+
+
+
                 TextButton(
-                  onPressed: () async {
+                  onPressed: botonDeshabilitado
+                      ? null
+                      : () async {
+                    setStateDialog(() => botonDeshabilitado = true); // desactiva inmediatamente
+
                     if (tipoPagoSeleccionado == null) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Seleccione un método de pago')),
                       );
+                      setStateDialog(() => botonDeshabilitado = false);
                       return;
                     }
+
                     final pago = double.tryParse(pagoCtrl.text);
                     if (pago == null) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Ingrese un monto válido')),
                       );
+                      setStateDialog(() => botonDeshabilitado = false);
                       return;
                     }
+
                     final total = calcularTotalFactura();
                     final saldo = total - pago;
+
                     final factura = Factura(
                       clienteId: clienteSeleccionado?.id,
                       fecha: DateTime.now(),
@@ -296,6 +309,7 @@ class _FacturaScreenState extends State<FacturaScreen> {
                       saldoPendiente: saldo,
                       estadoPago: saldo <= 0 ? 'Pagado' : 'Crédito',
                     );
+
                     final facturaId = await DBHelper.insertarFactura(factura);
                     for (var d in detalles) {
                       d.facturaId = facturaId;
@@ -309,18 +323,30 @@ class _FacturaScreenState extends State<FacturaScreen> {
                       productos: productos,
                     );
 
-                    Navigator.pop(context);
-                    setState(() {
-                      clienteSeleccionado = null;
-                      detalles.clear();
-                      cantidadControllers.clear();
-                      precioControllers.clear();
-                      clienteBusquedaController.clear();
-                      productoBusquedaController.clear();
-                    });
+                    if (context.mounted) {
+                      Navigator.pop(context); // Cierra el diálogo
+                      setState(() {
+                        clienteSeleccionado = null;
+                        detalles.clear();
+                        cantidadControllers.clear();
+                        precioControllers.clear();
+                        clienteBusquedaController.clear();
+                        productoBusquedaController.clear();
+                      });
+                    }
                   },
-                  child: const Text('Confirmar'),
+                  child: botonDeshabilitado
+                      ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                      : const Text('Confirmar'),
                 ),
+
+
+
+
               ],
             );
           },
