@@ -8,6 +8,7 @@ import '../utils/pdf_generator.dart';
 import 'dart:io';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import 'detalle_venta_screen.dart';
 
 class DetalleCargueScreen extends StatelessWidget {
   final Cargue cargue;
@@ -28,6 +29,14 @@ class DetalleCargueScreen extends StatelessWidget {
     final clientes = clienteProvider.clientesMap;
     final format = DateFormat('dd/MM/yyyy HH:mm');
 
+    final totalCargue = facturas.fold<double>(0, (sum, f) => sum + f.total);
+    final totalEfectivo = facturas
+        .where((f) => f.tipoPago == 'Contado')
+        .fold<double>(0, (sum, f) => sum + f.pagado);
+    final totalCredito = facturas
+        .where((f) => f.tipoPago == 'Crédito')
+        .fold<double>(0, (sum, f) => sum + f.saldoPendiente);
+
     return Scaffold(
       appBar: AppBar(title: Text('Cargue #${cargue.id}')),
       body: Padding(
@@ -40,6 +49,11 @@ class DetalleCargueScreen extends StatelessWidget {
             Text('Fecha: ${format.format(cargue.fecha)}'),
             if (cargue.observaciones.isNotEmpty)
               Text('Observaciones: ${cargue.observaciones}'),
+            const SizedBox(height: 8),
+            Text('Total cargue: \$${totalCargue.toStringAsFixed(0)}'),
+            Text('Total efectivo: \$${totalEfectivo.toStringAsFixed(0)}'),
+            Text('Total crédito: \$${totalCredito.toStringAsFixed(0)}'),
+
             const Divider(),
 
             Center(
@@ -88,6 +102,21 @@ class DetalleCargueScreen extends StatelessWidget {
                   return ListTile(
                     title: Text("Factura #${f.id} - ${cliente?.nombre ?? 'Cliente NR'}"),
                     subtitle: Text("${format.format(f.fecha)} - \$${f.total.toStringAsFixed(0)}"),
+                    onTap: () {
+                      final detallesFactura = detalles.where((d) => d.facturaId == f.id).toList();
+
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => DetalleVentaScreen(
+                            factura: f,
+                            cliente: cliente,
+                            detalles: detallesFactura,
+                            productosMap: ventasProvider.productosMap,
+                          ),
+                        ),
+                      );
+                    },
                   );
                 },
               ),

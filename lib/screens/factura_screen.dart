@@ -101,11 +101,11 @@ class _FacturaScreenState extends State<FacturaScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('Agregar nuevo cliente'),
+          title: Text('Cliente no registrado, Guardar nuevo cliente'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Nombre: $nombre'),
+              Text('Nombre: $nombre', style: TextStyle(fontWeight: FontWeight.bold)),
               TextField(
                 controller: telefonoCtrl,
                 decoration: InputDecoration(labelText: 'Teléfono (opcional)'),
@@ -271,8 +271,6 @@ class _FacturaScreenState extends State<FacturaScreen> {
                   child: const Text('Cancelar'),
                 ),
 
-
-
                 TextButton(
                   onPressed: botonDeshabilitado
                       ? null
@@ -343,10 +341,6 @@ class _FacturaScreenState extends State<FacturaScreen> {
                   )
                       : const Text('Confirmar'),
                 ),
-
-
-
-
               ],
             );
           },
