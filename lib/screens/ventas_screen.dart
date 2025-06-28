@@ -16,7 +16,7 @@ class VentasScreen extends StatefulWidget {
 class _VentasScreenState extends State<VentasScreen> {
   final NumberFormat currencyFormat = NumberFormat('#,##0', 'es_CO');
   final TextEditingController _searchController = TextEditingController();
-  final DateTime _fechaPorDefecto = DateTime.now().subtract(const Duration(days: 0)); // filtra facturas por X dias y los muestra por defecto
+  final DateTime _fechaPorDefecto = DateTime.now().subtract(const Duration(days: 1)); // filtra facturas por X dias y los muestra por defecto
 
   String _estadoPagoSeleccionado = 'Todos';
   DateTimeRange? _rangoFechas;
@@ -52,10 +52,12 @@ class _VentasScreenState extends State<VentasScreen> {
           factura.estadoPago.toLowerCase().trim() ==
               _estadoPagoSeleccionado.toLowerCase().trim();
 
+      final estaFiltrando = _searchController.text.isNotEmpty || _estadoPagoSeleccionado != 'Todos';
+
       final coincideFecha = _rangoFechas != null
           ? (factura.fecha.isAfter(_rangoFechas!.start.subtract(const Duration(days: 1))) &&
           factura.fecha.isBefore(_rangoFechas!.end.add(const Duration(days: 1))))
-          : factura.fecha.isAfter(_fechaPorDefecto);
+          : (estaFiltrando ? true : factura.fecha.isAfter(_fechaPorDefecto));
 
       return coincideBusqueda && coincideEstado && coincideFecha;
     }).toList();

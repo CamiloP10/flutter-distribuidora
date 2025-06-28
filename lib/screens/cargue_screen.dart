@@ -27,6 +27,7 @@ class CargueScreen extends StatefulWidget {
 
 class _CargueScreenState extends State<CargueScreen> {
   String vehiculoAsignado = '';
+  int _limiteFacturas = 20;
   final Set<int> facturasSeleccionadas = {};
   final TextEditingController _conductorController = TextEditingController();
   final TextEditingController _observacionController = TextEditingController();
@@ -43,8 +44,10 @@ class _CargueScreenState extends State<CargueScreen> {
   @override
   Widget build(BuildContext context) {
     final ventasProvider = Provider.of<VentasProvider>(context);
-    final facturas = [...ventasProvider.facturas]
-      ..sort((a, b) => b.fecha.compareTo(a.fecha));
+    final todasLasFacturas = [...ventasProvider.facturas]..sort((a, b) => b.fecha.compareTo(a.fecha));
+    final facturas = todasLasFacturas.take(_limiteFacturas).toList();
+    final hayMasFacturas = todasLasFacturas.length > facturas.length;
+
     final clientes = Provider.of<ClienteProvider>(context).clientes;
 
     String obtenerNombreCliente(int? clienteId) {
@@ -118,6 +121,17 @@ class _CargueScreenState extends State<CargueScreen> {
                 },
               ),
             ),
+
+            if (hayMasFacturas)
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _limiteFacturas += 20;
+                  });
+                },
+                child: const Text("Ver más facturas"),
+              ),
+
             ElevatedButton.icon(
               onPressed: vehiculoAsignado.isNotEmpty && facturasSeleccionadas.isNotEmpty
                   ? () {
