@@ -154,19 +154,22 @@ class PdfGenerator {
           pw.Text('Fecha: ${formatFecha.format(cargue.fecha)}', style: const pw.TextStyle(fontSize: 9)),
           if (cargue.observaciones.isNotEmpty)
             pw.Text('Obs: ${cargue.observaciones}', style: const pw.TextStyle(fontSize: 9)),
-          pw.SizedBox(height: 6),
+          pw.Text('Facturas asignadas:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
           pw.Divider(),
-
-          pw.Text('Facturas asignadas:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
           ...facturasCargue.map((f) {
             final clienteNombre = clientes[f.clienteId ?? 0]?.nombre ?? 'NR';
-            return pw.Text(
-              'Fact. #${f.id} - $clienteNombre : \$${formatMiles.format(f.total)}',
-              style: const pw.TextStyle(fontSize: 9),
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text('factura #${f.id} -$clienteNombre', style: const pw.TextStyle(fontSize: 8)),
+                pw.Text('Total: \$${formatMiles.format(f.total)}      Efectivo.[  ]', style: const pw.TextStyle(fontSize: 8)),
+                pw.Text('Otro:__________________________', style: const pw.TextStyle(fontSize: 8)),
+                pw.Divider(thickness: 0.5),
+                //pw.SizedBox(height: 4),
+              ],
             );
           }),
 
-          pw.SizedBox(height: 4),
           pw.Text('Total cargue: \$${formatMiles.format(totalCargue)}',
               style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
           pw.Text('Total efectivo: \$${formatMiles.format(totalPagado)}',
@@ -176,7 +179,6 @@ class PdfGenerator {
 
           pw.Divider(),
 
-          pw.SizedBox(height: 6),
           pw.Text('Resumen de productos:',
               style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
           ...cantidadPorProducto.entries.map((entry) {
@@ -233,7 +235,6 @@ class PdfGenerator {
         ],
       ),
     );
-
     return pdf.save();
   }
 
