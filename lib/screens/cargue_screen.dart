@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/cargue.dart';
-import '../providers/cargue_provider.dart';
 import '../providers/ventas_provider.dart';
 import '../providers/cliente_provider.dart';
 import '../models/cliente.dart';
@@ -13,7 +12,6 @@ import 'package:share_plus/share_plus.dart';
 
 int generarIdCortoUnico() {
   final timestamp = DateTime.now().millisecondsSinceEpoch;
-  // Tomamos los últimos 8 dígitos del timestamp para el ID
   final idStr = timestamp.toString().substring(timestamp.toString().length - 8);
   return int.parse(idStr);
 }
@@ -31,13 +29,14 @@ class _CargueScreenState extends State<CargueScreen> {
   final Set<int> facturasSeleccionadas = {};
   final TextEditingController _conductorController = TextEditingController();
   final TextEditingController _observacionController = TextEditingController();
+  bool _botonDeshabilitado = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final ventasProvider = Provider.of<VentasProvider>(context, listen: false);
-      ventasProvider.cargarDatos(); //fuerza la recarga de facturas al entrar a esta pantalla
+      ventasProvider.cargarDatos();
     });
   }
 
@@ -47,7 +46,6 @@ class _CargueScreenState extends State<CargueScreen> {
     final todasLasFacturas = [...ventasProvider.facturas]..sort((a, b) => b.fecha.compareTo(a.fecha));
     final facturas = todasLasFacturas.take(_limiteFacturas).toList();
     final hayMasFacturas = todasLasFacturas.length > facturas.length;
-
     final clientes = Provider.of<ClienteProvider>(context).clientes;
 
     String obtenerNombreCliente(int? clienteId) {
@@ -114,14 +112,11 @@ class _CargueScreenState extends State<CargueScreen> {
                       });
                     },
                     title: Text("Factura #${idFactura} - ${obtenerNombreCliente(factura.clienteId)}"),
-                    subtitle: Text(
-                      "${factura.fecha.toString().substring(0, 16)} - Total: \$${factura.total.toStringAsFixed(0)}",
-                    ),
+                    subtitle: Text("${factura.fecha.toString().substring(0, 16)} - Total: \$${factura.total.toStringAsFixed(0)}"),
                   );
                 },
               ),
             ),
-
             if (hayMasFacturas)
               TextButton(
                 onPressed: () {
@@ -131,105 +126,110 @@ class _CargueScreenState extends State<CargueScreen> {
                 },
                 child: const Text("Ver más facturas"),
               ),
-
             ElevatedButton.icon(
-              onPressed: vehiculoAsignado.isNotEmpty && facturasSeleccionadas.isNotEmpty
+              onPressed: vehiculoAsignado.isNotEmpty && facturasSeleccionadas.isNotEmpty && !_botonDeshabilitado
                   ? () {
                 showDialog(
                   context: context,
                   builder: (context) {
-                    return AlertDialog(
-                      title: const Text("Detalles del Cargue"),
-                      content: SingleChildScrollView(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            TextField(
-                              controller: _conductorController,
-                              decoration: const InputDecoration(
-                                labelText: "Nombre del conductor *",
-                                border: OutlineInputBorder(),
+                    return StatefulBuilder(
+                      builder: (context, setStateDialog) => AlertDialog(
+                        title: const Text("Detalles del Cargue"),
+                        content: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              TextField(
+                                controller: _conductorController,
+                                decoration: const InputDecoration(
+                                  labelText: "Nombre del conductor *",
+                                  border: OutlineInputBorder(),
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 16),
-                            TextField(
-                              controller: _observacionController,
-                              decoration: const InputDecoration(
-                                labelText: "Observaciones",
-                                border: OutlineInputBorder(),
+                              const SizedBox(height: 16),
+                              TextField(
+                                controller: _observacionController,
+                                decoration: const InputDecoration(
+                                  labelText: "Observaciones",
+                                  border: OutlineInputBorder(),
+                                ),
+                                maxLines: 3,
                               ),
-                              maxLines: 3,
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: const Text("Cancelar"),
+                          ),
+                          ElevatedButton(
+                            onPressed: _botonDeshabilitado
+                                ? null
+                                : () async {
+                              setStateDialog(() => _botonDeshabilitado = true);
+
+                              final conductor = _conductorController.text.trim();
+                              if (conductor.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text("El nombre del conductor es obligatorio")),
+                                );
+                                setStateDialog(() => _botonDeshabilitado = false);
+                                return;
+                              }
+
+                              final nuevoCargue = Cargue(
+                                id: generarIdCortoUnico(),
+                                vehiculoAsignado: vehiculoAsignado,
+                                fecha: DateTime.now(),
+                                facturaIds: facturasSeleccionadas.toList(),
+                                conductor: conductor,
+                                observaciones: _observacionController.text.trim(),
+                              );
+
+                              try {
+                                await DBHelper.insertarCargue(nuevoCargue);
+
+                                final clienteProvider = Provider.of<ClienteProvider>(context, listen: false);
+                                final pdfBytes = await PdfGenerator.generarCarguePDF(
+                                  cargue: nuevoCargue,
+                                  facturas: ventasProvider.facturas,
+                                  detalles: ventasProvider.getAllDetalles(),
+                                  productos: ventasProvider.productosMap.values.toList(),
+                                  clientes: clienteProvider.clientesMap,
+                                );
+
+                                final outputDir = await getTemporaryDirectory();
+                                final file = File("${outputDir.path}/cargue_\${nuevoCargue.id}.pdf");
+                                await file.writeAsBytes(pdfBytes);
+                                await Share.shareXFiles([
+                                  XFile(file.path)
+                                ], text: 'Cargue #\${nuevoCargue.id}');
+
+                                if (mounted) {
+                                  Navigator.of(context).pop();
+                                  Navigator.pop(context);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text("Cargue generado y compartido con éxito")),
+                                  );
+                                }
+                              } catch (e) {
+                                setStateDialog(() => _botonDeshabilitado = false);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text("Error al guardar el cargue: \$e")),
+                                );
+                              }
+                            },
+                            child: _botonDeshabilitado
+                                ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                                : const Text("Confirmar"),
+                          ),
+                        ],
                       ),
-                      actions: [
-                        TextButton(
-                          onPressed: () {
-                            Navigator.of(context).pop(); // cerrar diálogo
-                          },
-                          child: const Text("Cancelar"),
-                        ),
-                        ElevatedButton(
-                          onPressed: () async {
-                            final conductor = _conductorController.text.trim();
-
-                            if (conductor.isEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("El nombre del conductor es obligatorio")),
-                              );
-                              return;
-                            }
-                            final nuevoCargue = Cargue(
-                              id: generarIdCortoUnico(),
-                              vehiculoAsignado: vehiculoAsignado,
-                              fecha: DateTime.now(),
-                              facturaIds: facturasSeleccionadas.toList(),
-                              conductor: conductor,
-                              observaciones: _observacionController.text.trim(),
-                            );
-
-                            try {
-                              // 1. Guardar en la base de datos
-                              await DBHelper.insertarCargue(nuevoCargue);
-
-                              // 2. Generar PDF
-                              final clienteProvider = Provider.of<ClienteProvider>(context, listen: false);
-                              final pdfBytes = await PdfGenerator.generarCarguePDF(
-                                cargue: nuevoCargue,
-                                facturas: ventasProvider.facturas,
-                                detalles: ventasProvider.getAllDetalles(),
-                                productos: ventasProvider.productosMap.values.toList(),
-                                clientes: clienteProvider.clientesMap,
-                              );
-
-                              // 3. Guardar archivo temporal y compartir
-                              final outputDir = await getTemporaryDirectory();
-                              final file = File("${outputDir.path}/cargue_${nuevoCargue.id}.pdf");
-
-                              await file.writeAsBytes(pdfBytes);
-                              await Share.shareXFiles(
-                                [XFile(file.path)],
-                                text: 'Cargue #${nuevoCargue.id} ',
-                              );
-
-                              // 4. Cerrar diálogos y mostrar confirmación
-                              Navigator.of(context).pop(); // Cierra AlertDialog
-                              Navigator.pop(context); // Regresa al home
-
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("Cargue generado y compartido con éxito")),
-                              );
-                            } catch (e) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text("Error al guardar el cargue: $e")),
-                              );
-                            }
-                          },
-
-                          child: const Text("Confirmar"),
-                        ),
-                      ],
                     );
                   },
                 );
@@ -237,9 +237,7 @@ class _CargueScreenState extends State<CargueScreen> {
                   : null,
               icon: const Icon(Icons.fire_truck),
               label: const Text("Generar Cargue"),
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 50),
-              ),
+              style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
             ),
           ],
         ),
