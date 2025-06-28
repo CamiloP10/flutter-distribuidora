@@ -87,6 +87,7 @@ class DetalleCargueScreen extends StatelessWidget {
               icon: const Icon(Icons.add),
               label: const Text('Agregar Factura'),
               onPressed: () async {
+                await ventasProvider.cargarDatos(); // recarga facturas y detalles
                 await mostrarDialogoSeleccionFacturas(context, cargue);
               },
             ),
@@ -148,10 +149,13 @@ Future<void> mostrarDialogoSeleccionFacturas(BuildContext context, Cargue cargue
             itemCount: facturasDisponibles.length,
             itemBuilder: (context, index) {
               final f = facturasDisponibles[index];
+              final clienteNombre = ventasProvider.getCliente(f.clienteId)?.nombre ?? 'Cliente NR';
               return StatefulBuilder(
                 builder: (context, setState) => CheckboxListTile(
-                  title: Text('Factura #${f.id} - \$${f.total.toStringAsFixed(0)}'),
-                  subtitle: Text(DateFormat('dd/MM/yyyy').format(f.fecha)),
+                  title: Text('F. #${f.id} - $clienteNombre'),
+                  subtitle: Text(
+                    '${DateFormat('dd/MM/yyyy HH:mm').format(f.fecha)} - \$${f.total.toStringAsFixed(0)}',
+                  ),
                   value: seleccionadas.contains(f.id),
                   onChanged: (val) {
                     setState(() {

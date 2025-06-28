@@ -192,7 +192,7 @@ class PdfGenerator {
                 ? producto.presentacion
                 : producto.nombre;
 
-            final cantidad = entry.value.toStringAsFixed(0);
+            final cantidad = formatearNumero(entry.value);
 
             return pw.Padding(
               padding: const pw.EdgeInsets.symmetric(vertical: 4),
