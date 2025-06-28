@@ -136,66 +136,90 @@ Future<void> mostrarDialogoSeleccionFacturas(BuildContext context, Cargue cargue
       .toList();
 
   List<int> seleccionadas = [];
+  int limiteFacturas = 20;
 
   await showDialog(
     context: context,
     builder: (_) {
-      return AlertDialog(
-        title: Text('Seleccionar Facturas'),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 300,
-          child: ListView.builder(
-            itemCount: facturasDisponibles.length,
-            itemBuilder: (context, index) {
-              final f = facturasDisponibles[index];
-              final clienteNombre = ventasProvider.getCliente(f.clienteId)?.nombre ?? 'Cliente NR';
-              return StatefulBuilder(
-                builder: (context, setState) => CheckboxListTile(
-                  title: Text('F. #${f.id} - $clienteNombre'),
-                  subtitle: Text(
-                    '${DateFormat('dd/MM/yyyy HH:mm').format(f.fecha)} - \$${f.total.toStringAsFixed(0)}',
+      return StatefulBuilder(
+        builder: (context, setState) {
+          final facturasLimitadas = facturasDisponibles.take(limiteFacturas).toList();
+          final hayMas = facturasDisponibles.length > facturasLimitadas.length;
+
+          return AlertDialog(
+            title: const Text('Seleccionar Facturas'),
+            content: SizedBox(
+              width: double.maxFinite,
+              height: 350,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: facturasLimitadas.length,
+                      itemBuilder: (context, index) {
+                        final f = facturasLimitadas[index];
+                        final clienteNombre = ventasProvider.getCliente(f.clienteId)?.nombre ?? 'Cliente NR';
+                        return CheckboxListTile(
+                          title: Text('F. #${f.id} - $clienteNombre'),
+                          subtitle: Text(
+                            '${DateFormat('dd/MM/yyyy HH:mm').format(f.fecha)} - \$${f.total.toStringAsFixed(0)}',
+                          ),
+                          value: seleccionadas.contains(f.id),
+                          onChanged: (val) {
+                            setState(() {
+                              if (val == true) {
+                                seleccionadas.add(f.id!);
+                              } else {
+                                seleccionadas.remove(f.id);
+                              }
+                            });
+                          },
+                        );
+                      },
+                    ),
                   ),
-                  value: seleccionadas.contains(f.id),
-                  onChanged: (val) {
-                    setState(() {
-                      if (val == true) {
-                        seleccionadas.add(f.id!);
-                      } else {
-                        seleccionadas.remove(f.id);
-                      }
-                    });
-                  },
-                ),
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (seleccionadas.isNotEmpty) {
-                final nuevasFacturas = List<int>.from(cargue.facturaIds)..addAll(seleccionadas);
-                final nuevoCargue = cargue.copyWith(facturaIds: nuevasFacturas.toSet().toList());
-                await ventasProvider.actualizarCargue(nuevoCargue);
+                  if (hayMas)
+                    Align(
+                      alignment: Alignment.center,
+                      child: TextButton(
+                        onPressed: () {
+                          setState(() {
+                            limiteFacturas += 20;
+                          });
+                        },
+                        child: const Text('Ver más facturas'),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  if (seleccionadas.isNotEmpty) {
+                    final nuevasFacturas = List<int>.from(cargue.facturaIds)..addAll(seleccionadas);
+                    final nuevoCargue = cargue.copyWith(facturaIds: nuevasFacturas.toSet().toList());
+                    await ventasProvider.actualizarCargue(nuevoCargue);
 
-                Navigator.pop(context);
+                    Navigator.pop(context);
 
-                // Refrescar vista
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => DetalleCargueScreen(cargue: nuevoCargue)),
-                );
-              }
-            },
-            child: const Text('Guardar'),
-          ),
-        ],
+                    // Recarga la pantalla con el nuevo cargue
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => DetalleCargueScreen(cargue: nuevoCargue)),
+                    );
+                  }
+                },
+                child: const Text('Guardar'),
+              ),
+            ],
+          );
+        },
       );
     },
   );
