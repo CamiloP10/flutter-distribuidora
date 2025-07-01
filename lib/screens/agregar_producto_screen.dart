@@ -4,7 +4,9 @@ import '../models/producto.dart';
 import '../providers/producto_provider.dart';
 
 class AgregarProductoScreen extends StatefulWidget {
-  const AgregarProductoScreen({super.key});
+  final Producto? producto; // null si es nuevo
+
+  const AgregarProductoScreen({super.key, this.producto});
 
   @override
   State<AgregarProductoScreen> createState() => _AgregarProductoScreenState();
@@ -16,16 +18,35 @@ class _AgregarProductoScreenState extends State<AgregarProductoScreen> {
   final TextEditingController cantidadController = TextEditingController();
   final TextEditingController precioController = TextEditingController();
 
+  @override
+  void initState() {
+    super.initState();
+    if (widget.producto != null) {
+      nombreController.text = widget.producto!.nombre;
+      presentacionController.text = widget.producto!.presentacion;
+      cantidadController.text = widget.producto!.cantidad.toInt().toString();
+      precioController.text = widget.producto!.precio.toInt().toString();
+    }
+  }
+
   void guardarProducto() async {
     final producto = Producto(
-      codigo: 'P${DateTime.now().millisecondsSinceEpoch}', // ID único
+      id: widget.producto?.id, // conservar el ID si se está editando
+      codigo: widget.producto?.codigo ?? 'P${DateTime.now().millisecondsSinceEpoch}',
       nombre: nombreController.text,
       presentacion: presentacionController.text,
       cantidad: double.tryParse(cantidadController.text) ?? 0,
       precio: double.tryParse(precioController.text) ?? 0.0,
     );
 
-    await context.read<ProductoProvider>().agregarProducto(producto);
+    final productoProvider = context.read<ProductoProvider>();
+
+    if (widget.producto != null) {
+      await productoProvider.actualizarProducto(producto);
+    } else {
+      await productoProvider.agregarProducto(producto);
+    }
+
     Navigator.pop(context, true); // Regresa a pantalla anterior con éxito
   }
 
@@ -35,7 +56,9 @@ class _AgregarProductoScreenState extends State<AgregarProductoScreen> {
     final nombresUnicos = productos.map((p) => p.nombre).toSet().toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Agregar Producto')),
+      appBar: AppBar(
+        title: Text(widget.producto != null ? 'Editar Producto' : 'Agregar Producto'),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: ListView(
@@ -67,7 +90,7 @@ class _AgregarProductoScreenState extends State<AgregarProductoScreen> {
             TextField(
               controller: precioController,
               decoration: const InputDecoration(labelText: 'Precio'),
-              keyboardType: TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
             ),
             const SizedBox(height: 16),
             ElevatedButton(

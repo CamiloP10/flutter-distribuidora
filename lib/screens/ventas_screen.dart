@@ -16,7 +16,7 @@ class VentasScreen extends StatefulWidget {
 class _VentasScreenState extends State<VentasScreen> {
   final NumberFormat currencyFormat = NumberFormat('#,##0', 'es_CO');
   final TextEditingController _searchController = TextEditingController();
-  final DateTime _fechaPorDefecto = DateTime.now().subtract(const Duration(days: 1)); // filtra facturas por X dias y los muestra por defecto
+  final DateTime _fechaPorDefecto = DateTime.now().subtract(const Duration(days: 3)); // filtra facturas por X dias y los muestra por defecto
 
   String _estadoPagoSeleccionado = 'Todos';
   DateTimeRange? _rangoFechas;

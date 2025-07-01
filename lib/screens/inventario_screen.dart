@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/producto.dart';
 import '../providers/producto_provider.dart';
+import 'agregar_producto_screen.dart';
+import 'package:intl/intl.dart';
+
+final NumberFormat currencyFormat = NumberFormat('#,##0', 'es_CO');
+
 
 class InventarioScreen extends StatefulWidget {
   const InventarioScreen({super.key});
@@ -17,10 +22,9 @@ class _InventarioScreenState extends State<InventarioScreen> {
   @override
   void initState() {
     super.initState();
-    // Cargar productos al iniciar (solo una vez)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = Provider.of<ProductoProvider>(context, listen: false);
-      provider.cargarProductos(); // carga desde DB y notifica
+      provider.cargarProductos();
     });
   }
 
@@ -42,7 +46,6 @@ class _InventarioScreenState extends State<InventarioScreen> {
     final productoProvider = Provider.of<ProductoProvider>(context);
     final productos = productoProvider.productos;
 
-    // Si no hay búsqueda, mostrar todos los productos
     final mostrar = busquedaController.text.isEmpty
         ? productos
         : productosFiltrados;
@@ -73,8 +76,26 @@ class _InventarioScreenState extends State<InventarioScreen> {
                 itemBuilder: (context, index) {
                   final p = mostrar[index];
                   return ListTile(
-                    title: Text('${p.presentacion} - \$${p.precio.toStringAsFixed(0)}'),
+                    title: Text('${p.presentacion} - \$${currencyFormat.format(p.precio.toInt())}'),
                     subtitle: Text('${p.nombre} - Cod: ${p.codigo}'),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.edit, color: Colors.blue),
+                      onPressed: () async {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => AgregarProductoScreen(producto: p),
+                          ),
+                        );
+
+                        if (result == true) {
+                          productoProvider.cargarProductos();
+                          if (busquedaController.text.isNotEmpty) {
+                            filtrarProductos(busquedaController.text, productoProvider.productos);
+                          }
+                        }
+                      },
+                    ),
                   );
                 },
               ),
@@ -87,7 +108,6 @@ class _InventarioScreenState extends State<InventarioScreen> {
         onPressed: () async {
           final result = await Navigator.pushNamed(context, '/agregarProducto');
           if (result == true) {
-            // volver a cargar desde provider
             productoProvider.cargarProductos();
             if (busquedaController.text.isNotEmpty) {
               filtrarProductos(busquedaController.text, productoProvider.productos);

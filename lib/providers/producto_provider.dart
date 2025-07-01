@@ -16,5 +16,10 @@ class ProductoProvider with ChangeNotifier {
     await DBHelper.insertarProducto(producto);
     await cargarProductos(); // recargar lista luego de agregar
   }
+
+  Future<void> actualizarProducto(Producto producto) async {
+    await DBHelper.actualizarProducto(producto);
+    await cargarProductos(); // para recargar la lista en pantalla
+  }
 //  agregar editarProducto, eliminarProducto, etc.
 }

@@ -95,6 +95,15 @@ class DBHelper {
     final maps = await db.query('producto');
     return maps.map((e) => Producto.fromMap(e)).toList();
   }
+  static Future<void> actualizarProducto(Producto producto) async {
+    final db = await initDb();
+    await db.update(
+      'producto',
+      producto.toMap(),
+      where: 'id = ?',
+      whereArgs: [producto.id],
+    );
+  }
 
   // CLIENTES
   static Future<int> insertarCliente(Cliente cliente) async {
