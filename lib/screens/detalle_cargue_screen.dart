@@ -30,12 +30,8 @@ class DetalleCargueScreen extends StatelessWidget {
     final format = DateFormat('dd/MM/yyyy HH:mm');
 
     final totalCargue = facturas.fold<double>(0, (sum, f) => sum + f.total);
-    final totalEfectivo = facturas
-        .where((f) => f.tipoPago == 'Contado')
-        .fold<double>(0, (sum, f) => sum + f.pagado);
-    final totalCredito = facturas
-        .where((f) => f.tipoPago == 'Crédito')
-        .fold<double>(0, (sum, f) => sum + f.saldoPendiente);
+    final totalEfectivo = facturas.fold<double>(0, (sum, f) => sum + f.pagado);
+    final totalCredito = facturas.fold<double>(0, (sum, f) => sum + f.saldoPendiente);
 
     return Scaffold(
       appBar: AppBar(title: Text('Cargue #${cargue.id}')),
