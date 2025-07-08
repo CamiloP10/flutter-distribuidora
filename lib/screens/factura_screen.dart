@@ -256,7 +256,7 @@ class _FacturaScreenState extends State<FacturaScreen> {
                   TextField(
                     controller: pagoCtrl,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Monto pagado'),
+                    decoration: const InputDecoration(labelText: 'Abono'),
                   ),
                   const SizedBox(height: 8),
                   TextField(
