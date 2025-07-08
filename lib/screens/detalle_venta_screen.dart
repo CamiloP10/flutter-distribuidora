@@ -6,6 +6,9 @@ import '../models/detalle_factura.dart';
 import '../models/producto.dart';
 import '../models/cliente.dart';
 import '../utils/pdf_generator.dart';
+import '../db/db_helper.dart';
+import 'package:intl/intl.dart';
+
 
 class DetalleVentaScreen extends StatelessWidget {
   final Factura factura;
@@ -20,6 +23,70 @@ class DetalleVentaScreen extends StatelessWidget {
     required this.detalles,
     required this.productosMap,
   }) : super(key: key);
+
+  void _mostrarDialogoAbono(BuildContext context) {
+    final TextEditingController abonoController = TextEditingController();
+    final currencyFormat = NumberFormat('#,##0', 'es_CO');
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Registrar Abono'),
+        content: TextField(
+          controller: abonoController,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(labelText: 'Valor del abono'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final abono = double.tryParse(abonoController.text) ?? 0;
+              if (abono <= 0) return;
+
+              final nuevoPagado = factura.pagado + abono;
+              final nuevoSaldo = factura.total - nuevoPagado;
+              final nuevoEstado = nuevoSaldo <= 0 ? 'Pagado' : factura.estadoPago;
+
+              final ahora = DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
+              final observacionNueva = 'Abono \$${currencyFormat.format(abono)} el $ahora';
+              final nuevaInfo = factura.informacion.isEmpty
+                  ? observacionNueva
+                  : '${factura.informacion}\n$observacionNueva';
+
+              final facturaActualizada = factura.copyWith(
+                pagado: nuevoPagado,
+                saldoPendiente: nuevoSaldo,
+                estadoPago: nuevoEstado,
+                informacion: nuevaInfo,
+              );
+
+              await DBHelper.actualizarFactura(facturaActualizada);
+
+              Navigator.pop(context);
+              Navigator.pop(context); // Cierra esta pantalla
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => DetalleVentaScreen(
+                    factura: facturaActualizada,
+                    cliente: cliente,
+                    detalles: detalles,
+                    productosMap: productosMap,
+                  ),
+                ),
+              );
+            },
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +109,17 @@ class DetalleVentaScreen extends StatelessWidget {
             Text('Tipo de Pago: ${factura.tipoPago}'),
             if (factura.informacion.isNotEmpty)
               Text('Observaciones: ${factura.informacion}'),
+
+            if (factura.estadoPago.toLowerCase() == 'crédito')
+              Center(
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.attach_money),
+                  label: const Text('Registrar Abono'),
+                  onPressed: () {
+                    _mostrarDialogoAbono(context);
+                  },
+                ),
+              ),
             const Divider(),
 
             // Botón para generar PDF y compartir

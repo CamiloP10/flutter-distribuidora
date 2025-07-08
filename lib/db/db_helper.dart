@@ -129,6 +129,16 @@ class DBHelper {
     return maps.map((e) => Factura.fromMap(e)).toList();
   }
 
+  static Future<void> actualizarFactura(Factura factura) async {
+    final db = await initDb();
+    await db.update(
+      'factura',
+      factura.toMap(),
+      where: 'id = ?',
+      whereArgs: [factura.id],
+    );
+  }
+
   // DETALLES DE FACTURA
   static Future<void> insertarDetallesFactura(List<DetalleFactura> detalles) async {
     final db = await initDb();
