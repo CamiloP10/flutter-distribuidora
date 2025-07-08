@@ -153,7 +153,7 @@ class _FacturaScreenState extends State<FacturaScreen> {
   Future<void> mostrarDialogoPago(List<Producto> productos) async {
     String? tipoPagoSeleccionado;
     final pagoCtrl = TextEditingController();
-    final obsCtrl = TextEditingController();
+
     bool botonDeshabilitado = false;
 
     // Validar cliente antes de continuar
@@ -259,10 +259,7 @@ class _FacturaScreenState extends State<FacturaScreen> {
                     decoration: const InputDecoration(labelText: 'Abono'),
                   ),
                   const SizedBox(height: 8),
-                  TextField(
-                    controller: obsCtrl,
-                    decoration: const InputDecoration(labelText: 'Observaciones'),
-                  ),
+
                 ],
               ),
               actions: [
@@ -296,6 +293,8 @@ class _FacturaScreenState extends State<FacturaScreen> {
 
                     final total = calcularTotalFactura();
                     final saldo = total - pago;
+                    final ahora = DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
+                    String historial = pago > 0 ? '[$ahora] Abono inicial: \$${pago.toStringAsFixed(0)}' : '';
 
                     final factura = Factura(
                       clienteId: clienteSeleccionado?.id,
@@ -303,7 +302,7 @@ class _FacturaScreenState extends State<FacturaScreen> {
                       total: total,
                       pagado: pago,
                       tipoPago: tipoPagoSeleccionado == 'Pago total' ? 'Contado' : 'Crédito',
-                      informacion: obsCtrl.text,
+                      informacion: historial,
                       saldoPendiente: saldo,
                       estadoPago: saldo <= 0 ? 'Pagado' : 'Crédito',
                     );
