@@ -7,8 +7,6 @@ import '../models/producto.dart';
 import '../models/cliente.dart';
 import '../utils/pdf_generator.dart';
 import '../db/db_helper.dart';
-import 'package:intl/intl.dart';
-
 
 class DetalleVentaScreen extends StatelessWidget {
   final Factura factura;

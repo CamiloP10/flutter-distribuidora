@@ -9,6 +9,7 @@ import 'screens/agregar_cliente_screen.dart';
 import 'providers/ventas_provider.dart';
 import 'providers/cargue_provider.dart';
 import 'providers/factura_provider.dart';
+import 'screens/creditos_screen.dart';
 
 
 void main() {
@@ -48,6 +49,7 @@ class MyApp extends StatelessWidget {
       routes: {
         '/agregarProducto': (context) => const AgregarProductoScreen(),
         '/agregarCliente': (context) => const AgregarClienteScreen(),
+        '/creditos': (context) => const CreditosScreen(),
       },
     );
   }

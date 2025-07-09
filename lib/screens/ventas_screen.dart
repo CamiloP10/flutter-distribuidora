@@ -5,6 +5,8 @@ import '../providers/ventas_provider.dart';
 import '../screens/detalle_venta_screen.dart';
 import '../models/cliente.dart';
 import '../models/producto.dart';
+import 'creditos_screen.dart'; // Asegúrate que el archivo exista
+
 
 class VentasScreen extends StatefulWidget {
   const VentasScreen({super.key});
@@ -63,7 +65,26 @@ class _VentasScreenState extends State<VentasScreen> {
     }).toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Historial de Ventas')),
+      appBar: AppBar(
+        title: const Text('Historial de Ventas'),
+        actions: [
+          IconButton(
+            icon: const Icon(
+                Icons.list_alt,
+                size: 32,
+                color: Colors.red,
+            ),
+            tooltip: 'Ver Créditos Antiguos',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CreditosScreen()),
+              );
+            },
+          ),
+        ],
+      ),
+
       body: Column(
         children: [
           Padding(
