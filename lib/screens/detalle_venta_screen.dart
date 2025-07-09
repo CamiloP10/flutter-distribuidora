@@ -88,7 +88,7 @@ class DetalleVentaScreen extends StatelessWidget {
   }
 
   void _mostrarDialogoReversion(BuildContext context) {
-    final TextEditingController abonoController = TextEditingController();
+    final TextEditingController abonoController = TextEditingController(text: '0');
     final currencyFormat = NumberFormat('#,##0', 'es_CO');
 
     showDialog(
@@ -108,7 +108,7 @@ class DetalleVentaScreen extends StatelessWidget {
           ElevatedButton(
             onPressed: () async {
               final abono = double.tryParse(abonoController.text) ?? 0;
-              if (abono <= 0 || abono > factura.total) return;
+              if (abono < 0 || abono > factura.total) return;
 
               final nuevoSaldo = factura.total - abono;
 
