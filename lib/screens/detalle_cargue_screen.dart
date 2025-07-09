@@ -9,22 +9,48 @@ import 'dart:io';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'detalle_venta_screen.dart';
+import '../models/factura.dart';
+import '../models/detalle_factura.dart';
 
-class DetalleCargueScreen extends StatelessWidget {
+
+class DetalleCargueScreen extends StatefulWidget {
   final Cargue cargue;
 
   const DetalleCargueScreen({super.key, required this.cargue});
 
   @override
+  State<DetalleCargueScreen> createState() => _DetalleCargueScreenState();
+}
+
+class _DetalleCargueScreenState extends State<DetalleCargueScreen> {
+  List<Factura> facturas = [];
+  List<DetalleFactura> detalles = [];
+
+  @override
+  void initState() {
+    super.initState();
+    cargarDatos();
+  }
+
+  Future<void> cargarDatos() async {
+    final ventasProvider = Provider.of<VentasProvider>(context, listen: false);
+    await ventasProvider.cargarDatos();
+
+    setState(() {
+      facturas = ventasProvider.facturas
+          .where((f) => widget.cargue.facturaIds.contains(f.id))
+          .toList();
+
+      detalles = ventasProvider.getAllDetalles()
+          .where((d) => widget.cargue.facturaIds.contains(d.facturaId))
+          .toList();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final ventasProvider = Provider.of<VentasProvider>(context);
     final clienteProvider = Provider.of<ClienteProvider>(context);
-    final facturas = ventasProvider.facturas
-        .where((f) => cargue.facturaIds.contains(f.id))
-        .toList();
-    final detalles = ventasProvider.getAllDetalles()
-        .where((d) => cargue.facturaIds.contains(d.facturaId))
-        .toList();
     final productos = ventasProvider.productosMap.values.toList();
     final clientes = clienteProvider.clientesMap;
     final format = DateFormat('dd/MM/yyyy HH:mm');
@@ -34,17 +60,17 @@ class DetalleCargueScreen extends StatelessWidget {
     final totalCredito = facturas.fold<double>(0, (sum, f) => sum + f.saldoPendiente);
 
     return Scaffold(
-      appBar: AppBar(title: Text('Cargue #${cargue.id}')),
+      appBar: AppBar(title: Text('Cargue #${widget.cargue.id}')),
       body: Padding(
         padding: const EdgeInsets.all(8.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Vehículo: ${cargue.vehiculoAsignado}'),
-            Text('Conductor: ${cargue.conductor}'),
-            Text('Fecha: ${format.format(cargue.fecha)}'),
-            if (cargue.observaciones.isNotEmpty)
-              Text('Observaciones: ${cargue.observaciones}'),
+            Text('Vehículo: ${widget.cargue.vehiculoAsignado}'),
+            Text('Conductor: ${widget.cargue.conductor}'),
+            Text('Fecha: ${format.format(widget.cargue.fecha)}'),
+            if (widget.cargue.observaciones.isNotEmpty)
+              Text('Observaciones: ${widget.cargue.observaciones}'),
             const SizedBox(height: 8),
             Text('Total cargue: \$${totalCargue.toStringAsFixed(0)}'),
             Text('Total efectivo: \$${totalEfectivo.toStringAsFixed(0)}'),
@@ -58,7 +84,7 @@ class DetalleCargueScreen extends StatelessWidget {
                 label: const Text('Imprimir PDF'),
                 onPressed: () async {
                   final pdf = await PdfGenerator.generarCarguePDF(
-                    cargue: cargue,
+                    cargue: widget.cargue,
                     facturas: facturas,
                     detalles: detalles,
                     productos: productos,
@@ -66,12 +92,12 @@ class DetalleCargueScreen extends StatelessWidget {
                   );
 
                   final dir = await getTemporaryDirectory();
-                  final file = File('${dir.path}/cargue_${cargue.id}.pdf');
+                  final file = File('${dir.path}/cargue_${widget.cargue.id}.pdf');
                   await file.writeAsBytes(pdf);
 
                   await Share.shareXFiles(
                     [XFile(file.path)],
-                    text: 'Cargue #${cargue.id}',
+                    text: 'Cargue #${widget.cargue.id}',
                   );
                 },
               ),
@@ -83,8 +109,9 @@ class DetalleCargueScreen extends StatelessWidget {
               icon: const Icon(Icons.add),
               label: const Text('Agregar Factura'),
               onPressed: () async {
-                await ventasProvider.cargarDatos(); // recarga facturas y detalles
-                await mostrarDialogoSeleccionFacturas(context, cargue);
+                await ventasProvider.cargarDatos(); // recarga datos actualizados
+                await mostrarDialogoSeleccionFacturas(context, widget.cargue);
+                await cargarDatos(); // actualizar la pantalla después de agregar
               },
             ),
 
@@ -96,13 +123,14 @@ class DetalleCargueScreen extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final f = facturas[index];
                   final cliente = clientes[f.clienteId ?? 0];
+
+                  final detallesFactura = detalles.where((d) => d.facturaId == f.id).toList();
+
                   return ListTile(
                     title: Text("Factura #${f.id} - ${cliente?.nombre ?? 'Cliente NR'}"),
                     subtitle: Text("${format.format(f.fecha)} - \$${f.total.toStringAsFixed(0)}"),
-                    onTap: () {
-                      final detallesFactura = detalles.where((d) => d.facturaId == f.id).toList();
-
-                      Navigator.push(
+                    onTap: () async {
+                      await Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (_) => DetalleVentaScreen(
@@ -113,6 +141,7 @@ class DetalleCargueScreen extends StatelessWidget {
                           ),
                         ),
                       );
+                      await cargarDatos(); // recarga después de regresar
                     },
                   );
                 },
@@ -200,15 +229,7 @@ Future<void> mostrarDialogoSeleccionFacturas(BuildContext context, Cargue cargue
                     final nuevasFacturas = List<int>.from(cargue.facturaIds)..addAll(seleccionadas);
                     final nuevoCargue = cargue.copyWith(facturaIds: nuevasFacturas.toSet().toList());
                     await ventasProvider.actualizarCargue(nuevoCargue);
-
                     Navigator.pop(context);
-
-                    // Recarga la pantalla con el nuevo cargue
-                    Navigator.pop(context);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => DetalleCargueScreen(cargue: nuevoCargue)),
-                    );
                   }
                 },
                 child: const Text('Guardar'),
