@@ -87,6 +87,67 @@ class DetalleVentaScreen extends StatelessWidget {
     );
   }
 
+  void _mostrarDialogoReversion(BuildContext context) {
+    final TextEditingController abonoController = TextEditingController();
+    final currencyFormat = NumberFormat('#,##0', 'es_CO');
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Cambiar factura a Crédito'),
+        content: TextField(
+          controller: abonoController,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(labelText: 'Abono:'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final abono = double.tryParse(abonoController.text) ?? 0;
+              if (abono <= 0 || abono > factura.total) return;
+
+              final nuevoSaldo = factura.total - abono;
+
+              final ahora = DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
+              final observacionNueva = 'Factura revertida a crédito con abono de \$${currencyFormat.format(abono)} el $ahora';
+              final nuevaInfo = factura.informacion.isEmpty
+                  ? observacionNueva
+                  : '${factura.informacion}\n$observacionNueva';
+
+              final facturaActualizada = factura.copyWith(
+                pagado: abono,
+                saldoPendiente: nuevoSaldo,
+                estadoPago: 'Crédito',
+                tipoPago: 'Crédito',
+                informacion: nuevaInfo,
+              );
+
+              await DBHelper.actualizarFactura(facturaActualizada);
+
+              Navigator.pop(context);
+              Navigator.pop(context); // Cierra esta pantalla
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => DetalleVentaScreen(
+                    factura: facturaActualizada,
+                    cliente: cliente,
+                    detalles: detalles,
+                    productosMap: productosMap,
+                  ),
+                ),
+              );
+            },
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -121,6 +182,18 @@ class DetalleVentaScreen extends StatelessWidget {
                 ),
               ),
             const Divider(),
+
+            if (factura.estadoPago.toLowerCase() == 'pagado')
+              Center(
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.undo),
+                  label: const Text('Revertir a Crédito'),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+                  onPressed: () {
+                    _mostrarDialogoReversion(context);
+                  },
+                ),
+              ),
 
             // Botón para generar PDF y compartir
             Center(
