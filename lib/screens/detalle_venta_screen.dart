@@ -228,14 +228,18 @@ class DetalleVentaScreen extends StatelessWidget {
                     await DBHelper.insertarDetallesFactura([nuevoDetalle]);
 
                     final nuevoTotal = factura.total + (cantidad * precio);
-                    final nuevoSaldo = nuevoTotal - factura.pagado;
-                    final nuevoEstado = nuevoSaldo <= 0 ? 'Pagado' : 'Crédito';
+                    // mantiene el estado pagado
+                    final nuevoSaldo = factura.estadoPago.toLowerCase() == 'pagado'
+                        ? 0
+                        : nuevoTotal - factura.pagado;
 
                     final facturaActualizada = factura.copyWith(
                       total: nuevoTotal,
-                      saldoPendiente: nuevoSaldo,
-                      estadoPago: nuevoEstado,
+                      saldoPendiente: nuevoSaldo.toDouble(),
+                      estadoPago: factura.estadoPago,
+                      tipoPago: factura.tipoPago,
                     );
+
 
                     await DBHelper.actualizarFactura(facturaActualizada);
 
