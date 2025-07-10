@@ -246,6 +246,7 @@ class DetalleVentaScreen extends StatelessWidget {
                       saldoPendiente: esPagado ? 0 : nuevoSaldo.toDouble(),
                       estadoPago: factura.estadoPago,
                       tipoPago: factura.tipoPago,
+                      informacion: factura.estadoPago.toLowerCase() == 'pagado' ? '' : factura.informacion,
                     );
 
                     await DBHelper.actualizarFactura(facturaActualizada);
@@ -380,15 +381,26 @@ class DetalleVentaScreen extends StatelessWidget {
                 },
               ),
             ),
+            const SizedBox(height: 10),
+            Center(
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.add),
+                label: const Text('Agregar Item'),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+                onPressed: () => _mostrarDialogoAgregarProducto(context),
+              ),
+            ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
+      /*
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _mostrarDialogoAgregarProducto(context),
         icon: const Icon(Icons.add),
         label: const Text('Agregar Item'),
         backgroundColor: Colors.teal,
-      ),
+      ),*/
     );
   }
   String formatearCantidad(double cantidad) {
