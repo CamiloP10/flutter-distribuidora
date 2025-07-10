@@ -147,6 +147,124 @@ class DetalleVentaScreen extends StatelessWidget {
     );
   }
 
+  void _mostrarDialogoAgregarProducto(BuildContext context) {
+    final TextEditingController cantidadCtrl = TextEditingController();
+    final TextEditingController precioCtrl = TextEditingController();
+    final TextEditingController productoCtrl = TextEditingController();
+    Producto? productoSeleccionado;
+
+    final productosDisponibles = productosMap.values.toList();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Agregar producto a la factura'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: productoCtrl,
+                    readOnly: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Producto',
+                      suffixIcon: Icon(Icons.search),
+                    ),
+                    onTap: () async {
+                      final Producto? seleccionado = await showSearch<Producto>(
+                        context: context,
+                        delegate: ProductoSearchDelegate(productosDisponibles),
+                      );
+
+                      if (seleccionado != null) {
+                        productoSeleccionado = seleccionado;
+                        productoCtrl.text = '${seleccionado.nombre} - ${seleccionado.presentacion}';
+                        precioCtrl.text = seleccionado.precio.toStringAsFixed(0);
+                        setState(() {});
+                      }
+
+                      if (seleccionado != null) {
+                        setState(() {
+                          productoSeleccionado = seleccionado;
+                          productoCtrl.text = '${seleccionado.nombre} - ${seleccionado.presentacion}';
+                          precioCtrl.text = seleccionado.precio.toStringAsFixed(0);
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: cantidadCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Cantidad'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: precioCtrl,
+                    keyboardType: TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: 'Precio unitario'),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (productoSeleccionado == null) return;
+                    final cantidad = double.tryParse(cantidadCtrl.text) ?? 0;
+                    final precio = double.tryParse(precioCtrl.text) ?? 0;
+                    if (cantidad <= 0 || precio <= 0) return;
+
+                    final nuevoDetalle = DetalleFactura(
+                      facturaId: factura.id!,
+                      productoId: productoSeleccionado!.id!,
+                      cantidad: cantidad,
+                      precioOriginal: productoSeleccionado!.precio,
+                      precioModificado: precio,
+                    );
+
+                    await DBHelper.insertarDetallesFactura([nuevoDetalle]);
+
+                    final nuevoTotal = factura.total + (cantidad * precio);
+                    final nuevoSaldo = nuevoTotal - factura.pagado;
+                    final nuevoEstado = nuevoSaldo <= 0 ? 'Pagado' : 'Crédito';
+
+                    final facturaActualizada = factura.copyWith(
+                      total: nuevoTotal,
+                      saldoPendiente: nuevoSaldo,
+                      estadoPago: nuevoEstado,
+                    );
+
+                    await DBHelper.actualizarFactura(facturaActualizada);
+
+                    if (context.mounted) {
+                      Navigator.pop(context); // Cierra el diálogo
+                      Navigator.pop(context); // Cierra la pantalla actual
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => DetalleVentaScreen(
+                            factura: facturaActualizada,
+                            cliente: cliente,
+                            detalles: [...detalles, nuevoDetalle],
+                            productosMap: productosMap,
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text('Guardar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final currencyFormat = NumberFormat('#,##0', 'es_CO');
@@ -254,9 +372,58 @@ class DetalleVentaScreen extends StatelessWidget {
           ],
         ),
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _mostrarDialogoAgregarProducto(context),
+        icon: const Icon(Icons.add),
+        label: const Text('Agregar Item'),
+        backgroundColor: Colors.teal,
+      ),
     );
   }
   String formatearCantidad(double cantidad) {
     return cantidad % 1 == 0 ? cantidad.toInt().toString() : cantidad.toString();
   }
 }
+
+class ProductoSearchDelegate extends SearchDelegate<Producto> {
+  final List<Producto> productos;
+
+  ProductoSearchDelegate(this.productos);
+
+  @override
+  List<Widget>? buildActions(BuildContext context) => [
+    IconButton(icon: const Icon(Icons.clear), onPressed: () => query = ''),
+  ];
+
+  @override
+  Widget? buildLeading(BuildContext context) =>
+      IconButton(
+        icon: const Icon(Icons.arrow_back),
+        onPressed: () => close(context, Producto(id: 0, codigo: '', nombre: '', presentacion: '', cantidad: 0, precio: 0)),
+      );
+
+  @override
+  Widget buildResults(BuildContext context) => _buildSuggestions();
+
+  @override
+  Widget buildSuggestions(BuildContext context) => _buildSuggestions();
+
+  Widget _buildSuggestions() {
+    final sugerencias = productos.where((p) =>
+    p.presentacion.toLowerCase().contains(query.toLowerCase()) ||
+        p.nombre.toLowerCase().contains(query.toLowerCase())).toList();
+
+    return ListView.builder(
+      itemCount: sugerencias.length,
+      itemBuilder: (context, index) {
+        final prod = sugerencias[index];
+        return ListTile(
+          title: Text('${prod.nombre} - ${prod.presentacion}'),
+          subtitle: Text('Precio: \$${prod.precio.toStringAsFixed(0)}'),
+          onTap: () => close(context, prod),
+        );
+      },
+    );
+  }
+}
+
