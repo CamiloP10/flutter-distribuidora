@@ -43,11 +43,11 @@ class DetalleVentaScreen extends StatelessWidget {
           ElevatedButton(
             onPressed: () async {
               final abono = double.tryParse(abonoController.text) ?? 0;
-              if (abono <= 0) return;
+              if (abono < 0) return;
 
               final nuevoPagado = factura.pagado + abono;
               final nuevoSaldo = factura.total - nuevoPagado;
-              final nuevoEstado = nuevoSaldo <= 0 ? 'Pagado' : factura.estadoPago;
+              final nuevoEstado = nuevoSaldo <= 0 ? 'Pagado' : 'Crédito';
 
               final ahora = DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
               final observacionNueva = 'Abono \$${currencyFormat.format(abono)} el $ahora';
@@ -106,7 +106,12 @@ class DetalleVentaScreen extends StatelessWidget {
           ElevatedButton(
             onPressed: () async {
               final abono = double.tryParse(abonoController.text) ?? 0;
-              if (abono < 0 || abono > factura.total) return;
+              if (abono < 0 || abono > factura.total) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('El abono debe ser mayor o igual a 0 y no puede superar el total')),
+                );
+                return;
+              }
 
               final nuevoSaldo = factura.total - abono;
 
@@ -233,13 +238,15 @@ class DetalleVentaScreen extends StatelessWidget {
                         ? 0
                         : nuevoTotal - factura.pagado;
 
+                    final esPagado = factura.estadoPago.toLowerCase() == 'pagado';
+
                     final facturaActualizada = factura.copyWith(
                       total: nuevoTotal,
-                      saldoPendiente: nuevoSaldo.toDouble(),
+                      pagado: esPagado ? nuevoTotal : factura.pagado,
+                      saldoPendiente: esPagado ? 0 : nuevoSaldo.toDouble(),
                       estadoPago: factura.estadoPago,
                       tipoPago: factura.tipoPago,
                     );
-
 
                     await DBHelper.actualizarFactura(facturaActualizada);
 
