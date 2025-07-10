@@ -289,16 +289,52 @@ class DetalleVentaScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Cliente: ${cliente?.nombre ?? 'NR'}'),
-            Text('Fecha: ${DateFormat('dd/MM/yyyy HH:mm').format(factura.fecha)}'),
+            Text('Cliente: ${cliente?.nombre ?? 'NR'} - ${DateFormat('dd/MM/yyyy HH:mm').format(factura.fecha)}'),
             Text('Estado de Pago: ${factura.estadoPago}'),
             Text('Total: \$${currencyFormat.format(factura.total)}'),
             Text('Pagado: \$${currencyFormat.format(factura.pagado)}'),
-            Text('Saldo Pendiente: \$${currencyFormat.format(factura.saldoPendiente)}'),
-            Text('Tipo de Pago: ${factura.tipoPago}'),
+            Text('Saldo Pendiente: \$${currencyFormat.format(factura.saldoPendiente)}; Tipo de Pago: ${factura.tipoPago}'),
             if (factura.informacion.isNotEmpty)
               Text('Observaciones: ${factura.informacion}'),
 
+            if (factura.estadoPago.toLowerCase() == 'crédito' || factura.estadoPago.toLowerCase() == 'pagado')
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.picture_as_pdf),
+                      label: const Text('Generar PDF'),
+                      onPressed: () async {
+                        final clienteFinal = cliente ?? Cliente(id: 0, nombre: 'NR', telefono: '', informacion: '');
+                        final pdfBytes = await PdfGenerator.generarFacturaPDF(
+                          factura: factura,
+                          cliente: clienteFinal,
+                          detalles: detalles,
+                          productos: productosList,
+                        );
+                        await Printing.sharePdf(bytes: pdfBytes, filename: 'Factura_${factura.id}.pdf');
+                      },
+                    ),
+                    if (factura.estadoPago.toLowerCase() == 'crédito')
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.attach_money),
+                        label: const Text('Registrar Abono'),
+                        onPressed: () => _mostrarDialogoAbono(context),
+                      ),
+                    if (factura.estadoPago.toLowerCase() == 'pagado')
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.undo),
+                        label: const Text('Revertir a Crédito'),
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+                        onPressed: () => _mostrarDialogoReversion(context),
+                      ),
+                  ],
+                ),
+              ),
+
+/*
             if (factura.estadoPago.toLowerCase() == 'crédito')
               Center(
                 child: ElevatedButton.icon(
@@ -340,6 +376,7 @@ class DetalleVentaScreen extends StatelessWidget {
                 },
               ),
             ),
+            */
             const SizedBox(height: 10),
             const Text('Productos:', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 5),
@@ -390,17 +427,10 @@ class DetalleVentaScreen extends StatelessWidget {
                 onPressed: () => _mostrarDialogoAgregarProducto(context),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 5),
           ],
         ),
       ),
-      /*
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _mostrarDialogoAgregarProducto(context),
-        icon: const Icon(Icons.add),
-        label: const Text('Agregar Item'),
-        backgroundColor: Colors.teal,
-      ),*/
     );
   }
   String formatearCantidad(double cantidad) {
