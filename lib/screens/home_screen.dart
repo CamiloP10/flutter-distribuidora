@@ -9,21 +9,32 @@ import 'cargue_historial_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-          title: Text('DISTRIBUIDORA  LA BELLEZA',
-        style: TextStyle(color: Colors.white54), )
-        , backgroundColor: Colors.black,
+        title: const Text(
+          'DISTRIBUIDORA  LA BELLEZA',
+          style: TextStyle(color: Colors.white54),
+        ),
+        backgroundColor: Colors.black,
       ),
       body: Padding(
-        padding: EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.start,
           children: [
+            const SizedBox(height: 20),
 
-            // prueba icon para crear facturas
+            // 🖼️ LOGO
+            Image.asset(
+              'assets/icon.png', // ruta del logo
+              height: 130,
+            ),
+            const SizedBox(height: 20),
+
+            // BOTONES
             ElevatedButton.icon(
               onPressed: () {
                 Navigator.push(
@@ -37,79 +48,79 @@ class HomeScreen extends StatelessWidget {
                 minimumSize: const Size(double.infinity, 50),
               ),
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
 
-            ElevatedButton.icon( // para ventas
+            ElevatedButton.icon(
               onPressed: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => VentasScreen()),
                 );
               },
-              icon: Icon(Icons.shopify),
-              label: Text('Ventas'),
+              icon: const Icon(Icons.shopify),
+              label: const Text('Ventas'),
               style: ElevatedButton.styleFrom(
-                minimumSize: Size(double.infinity, 50),
+                minimumSize: const Size(double.infinity, 50),
               ),
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
 
-            ElevatedButton.icon( // para inventario
+            ElevatedButton.icon(
               onPressed: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => InventarioScreen()),
                 );
               },
-              icon: Icon(Icons.inventory),
-              label: Text('Inventario'),
+              icon: const Icon(Icons.inventory),
+              label: const Text('Inventario'),
               style: ElevatedButton.styleFrom(
-                minimumSize: Size(double.infinity, 50),
+                minimumSize: const Size(double.infinity, 50),
               ),
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
 
-            ElevatedButton.icon(//para clientes
+            ElevatedButton.icon(
               onPressed: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => ClientesScreen()),
                 );
               },
-              icon: Icon(Icons.people),
-              label: Text('Clientes'),
+              icon: const Icon(Icons.people),
+              label: const Text('Clientes'),
               style: ElevatedButton.styleFrom(
-                minimumSize: Size(double.infinity, 50),
+                minimumSize: const Size(double.infinity, 50),
               ),
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
 
-            ElevatedButton.icon( // para generar cargues
+            ElevatedButton.icon(
               onPressed: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const CargueScreen()),
                 );
               },
-              icon: Icon(Icons.fire_truck),
-              label: Text('Asignar Cargue'),
+              icon: const Icon(Icons.fire_truck),
+              label: const Text('Asignar Cargue'),
               style: ElevatedButton.styleFrom(
-                minimumSize: Size(double.infinity, 50),
+                minimumSize: const Size(double.infinity, 50),
               ),
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
 
-            ElevatedButton.icon( // para ver cargues
+            ElevatedButton.icon(
               onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const CargueHistorialScreen()),
-                  );
-                },
-              icon: Icon(Icons.delivery_dining),
-              label: Text('Historial Cargues'),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const CargueHistorialScreen()),
+                );
+              },
+              icon: const Icon(Icons.delivery_dining),
+              label: const Text('Historial Cargues'),
               style: ElevatedButton.styleFrom(
-                minimumSize: Size(double.infinity, 50),
+                minimumSize: const Size(double.infinity, 50),
               ),
             ),
           ],
