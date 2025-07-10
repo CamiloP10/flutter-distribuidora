@@ -294,7 +294,14 @@ class _FacturaScreenState extends State<FacturaScreen> {
                     final total = calcularTotalFactura();
                     final saldo = total - pago;
                     final ahora = DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
-                    String historial = pago > 0 ? '[$ahora] Abono inicial: \$${pago.toStringAsFixed(0)}' : '';
+                    String historial = '';
+                    if (tipoPagoSeleccionado == 'Crédito') {
+                      if (pago > 0 && saldo > 0) {
+                        historial = '[$ahora] Abono inicial: \$${pago.toStringAsFixed(0)}';
+                      } else {
+                        historial = '[$ahora] Crédito sin abono inicial';
+                      }
+                    }
 
                     final factura = Factura(
                       clienteId: clienteSeleccionado?.id,
@@ -340,6 +347,9 @@ class _FacturaScreenState extends State<FacturaScreen> {
                   )
                       : const Text('Confirmar'),
                 ),
+
+
+
               ],
             );
           },
