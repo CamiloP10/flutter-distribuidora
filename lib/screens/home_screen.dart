@@ -5,6 +5,7 @@ import 'factura_screen.dart';
 import 'ventas_screen.dart';
 import 'cargue_screen.dart';
 import 'cargue_historial_screen.dart';
+import 'cierre_dia_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -118,6 +119,21 @@ class HomeScreen extends StatelessWidget {
               },
               icon: const Icon(Icons.delivery_dining),
               label: const Text('Historial Cargues'),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 50),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const CierreDiaScreen()),
+                );
+              },
+              icon: const Icon(Icons.checklist_rounded),
+              label: const Text('Cierre del Día'),
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 50),
               ),
