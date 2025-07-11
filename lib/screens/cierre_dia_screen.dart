@@ -13,58 +13,67 @@ class _CierreDiaScreenState extends State<CierreDiaScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<CierreDiaProvider>(context, listen: false).cargarResumenDelDia();
-    });
+    final provider = Provider.of<CierreDiaProvider>(context, listen: false);
+    provider.cargarResumenDelDia();
   }
 
   @override
   Widget build(BuildContext context) {
+    final provider = Provider.of<CierreDiaProvider>(context);
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Cierre del Día'),
-        backgroundColor: Colors.teal,
-      ),
-      body: Consumer<CierreDiaProvider>(
-        builder: (context, provider, _) {
-          if (provider.isLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      appBar: AppBar(title: const Text('Cierre del Día')),
+      body: provider.isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _buildFechaSelector(context, provider),
+          const SizedBox(height: 16),
+          _buildResumenCard('Total de Facturas', provider.totalFacturas.toString(), Icons.receipt_long),
+          _buildResumenCard('Total Recibido', '\$${provider.totalPagado.toStringAsFixed(0)}', Icons.attach_money),
+          _buildResumenCard('Total Créditos', '\$${provider.totalCredito.toStringAsFixed(0)}', Icons.credit_card),
+          _buildResumenCard('Total Venta del Día', '\$${provider.totalVentas.toStringAsFixed(0)}', Icons.bar_chart),
 
-          if (provider.totalFacturas == 0) {
-            return const Center(
-              child: Text('No hay facturas registradas para hoy.'),
-            );
-          }
-
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              _buildResumenCard('Total de Facturas', provider.totalFacturas.toString(), Icons.receipt),
-              _buildResumenCard('Total Efectivo', '\$${provider.totalEfectivo.toStringAsFixed(0)}', Icons.money),
-              _buildResumenCard('Total Transferencia', '\$${provider.totalTransferencia.toStringAsFixed(0)}', Icons.account_balance),
-              _buildResumenCard('Total Créditos Pendientes', '\$${provider.totalCredito.toStringAsFixed(0)}', Icons.credit_card),
-              const Divider(),
-              _buildResumenCard('Total Recaudado Hoy', '\$${provider.totalRecaudado.toStringAsFixed(0)}', Icons.attach_money),
-            ],
-          );
-        },
+        ],
       ),
     );
   }
 
   Widget _buildResumenCard(String titulo, String valor, IconData icono) {
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      elevation: 3,
       child: ListTile(
         leading: Icon(icono, color: Colors.teal),
         title: Text(titulo),
-        trailing: Text(
-          valor,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-        ),
+        trailing: Text(valor, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
       ),
+    );
+  }
+
+  Widget _buildFechaSelector(BuildContext context, CierreDiaProvider provider) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          'Fecha: ${provider.fechaSeleccionada.day}/${provider.fechaSeleccionada.month}/${provider.fechaSeleccionada.year}',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        ElevatedButton.icon(
+          onPressed: () async {
+            final nuevaFecha = await showDatePicker(
+              context: context,
+              initialDate: provider.fechaSeleccionada,
+              firstDate: DateTime(2023),
+              lastDate: DateTime.now(),
+            );
+            if (nuevaFecha != null) {
+              provider.cambiarFecha(nuevaFecha);
+            }
+          },
+          icon: const Icon(Icons.calendar_today),
+          label: const Text('Cambiar'),
+        ),
+      ],
     );
   }
 }
