@@ -228,8 +228,23 @@ Future<void> mostrarDialogoSeleccionFacturas(BuildContext context, Cargue cargue
                   if (seleccionadas.isNotEmpty) {
                     final nuevasFacturas = List<int>.from(cargue.facturaIds)..addAll(seleccionadas);
                     final nuevoCargue = cargue.copyWith(facturaIds: nuevasFacturas.toSet().toList());
+
                     await ventasProvider.actualizarCargue(nuevoCargue);
-                    Navigator.pop(context);
+                    await ventasProvider.cargarDatos(); // Recarga todos los datos
+
+                    Navigator.pop(context); // Cierra el diálogo
+
+                    //Reemplaza la pantalla para actualizar datos en pantalla
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => DetalleCargueScreen(cargue: nuevoCargue),
+                      ),
+                    );
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Factura(s) añadida(s) correctamente')),
+                    );
                   }
                 },
                 child: const Text('Guardar'),
