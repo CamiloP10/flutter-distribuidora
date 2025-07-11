@@ -15,7 +15,14 @@ class DBHelper {
   static Future<Database> initDb() async {
     if (_db != null) return _db!;
     String path = join(await getDatabasesPath(), 'inventario.db');
-    _db = await openDatabase(path, version: 1, onCreate: _onCreate);
+    //_db = await openDatabase(path, version: 1, onCreate: _onCreate); crea la Db desde 0
+    _db = await openDatabase(
+      path,
+      version: 2, //Aumenta la versión cuando se añada otra tabla a la db
+      onCreate: _onCreate,
+      onUpgrade: _onUpgrade, //actualiza para no borrar datos de las tablas anteriores
+    );
+
     return _db!;
   }
 
@@ -83,6 +90,21 @@ class DBHelper {
   )
     ''');
   }
+
+  static Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('''
+      CREATE TABLE abono (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        facturaId INTEGER,
+        monto REAL,
+        fecha TEXT,
+        FOREIGN KEY (facturaId) REFERENCES factura(id)
+      )
+    ''');
+    }
+  }
+
 
   // PRODUCTOS
   static Future<int> insertarProducto(Producto producto) async {
