@@ -5,8 +5,7 @@ import '../providers/ventas_provider.dart';
 import '../screens/detalle_venta_screen.dart';
 import '../models/cliente.dart';
 import '../models/producto.dart';
-import 'creditos_screen.dart'; // Asegúrate que el archivo exista
-
+import 'creditos_screen.dart';
 
 class VentasScreen extends StatefulWidget {
   const VentasScreen({super.key});

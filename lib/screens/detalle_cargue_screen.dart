@@ -12,7 +12,6 @@ import 'detalle_venta_screen.dart';
 import '../models/factura.dart';
 import '../models/detalle_factura.dart';
 
-
 class DetalleCargueScreen extends StatefulWidget {
   final Cargue cargue;
 

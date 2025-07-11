@@ -3,7 +3,6 @@ import 'inventario_screen.dart';
 import 'clientes_screen.dart';
 import 'factura_screen.dart';
 import 'ventas_screen.dart';
-import '../db/db_helper.dart';
 import 'cargue_screen.dart';
 import 'cargue_historial_screen.dart';
 

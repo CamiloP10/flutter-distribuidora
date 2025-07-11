@@ -334,49 +334,6 @@ class DetalleVentaScreen extends StatelessWidget {
                 ),
               ),
 
-/*
-            if (factura.estadoPago.toLowerCase() == 'crédito')
-              Center(
-                child: ElevatedButton.icon(
-                  icon: const Icon(Icons.attach_money),
-                  label: const Text('Registrar Abono'),
-                  onPressed: () {
-                    _mostrarDialogoAbono(context);
-                  },
-                ),
-              ),
-            const Divider(),
-
-            if (factura.estadoPago.toLowerCase() == 'pagado')
-              Center(
-                child: ElevatedButton.icon(
-                  icon: const Icon(Icons.undo),
-                  label: const Text('Revertir a Crédito'),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-                  onPressed: () {
-                    _mostrarDialogoReversion(context);
-                  },
-                ),
-              ),
-
-            // Botón para generar PDF y compartir
-            Center(
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.picture_as_pdf),
-                label: const Text('Generar PDF'),
-                onPressed: () async {
-                  final clienteFinal = cliente ?? Cliente(id: 0, nombre: 'NR', telefono: '', informacion: '');
-                  final pdfBytes = await PdfGenerator.generarFacturaPDF(
-                    factura: factura,
-                    cliente: clienteFinal,
-                    detalles: detalles,
-                    productos: productosList,
-                  );
-                  await Printing.sharePdf(bytes: pdfBytes, filename: 'Factura_${factura.id}.pdf');
-                },
-              ),
-            ),
-            */
             const SizedBox(height: 10),
             const Text('Productos:', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 5),
@@ -479,4 +436,3 @@ class ProductoSearchDelegate extends SearchDelegate<Producto> {
     );
   }
 }
-

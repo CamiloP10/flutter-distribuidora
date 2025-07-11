@@ -7,7 +7,6 @@ import 'package:intl/intl.dart';
 
 final NumberFormat currencyFormat = NumberFormat('#,##0', 'es_CO');
 
-
 class InventarioScreen extends StatefulWidget {
   const InventarioScreen({super.key});
 

@@ -6,7 +6,6 @@ import '../models/detalle_factura.dart';
 import '../db/db_helper.dart';
 import '../models/cargue.dart';
 
-
 class VentasProvider with ChangeNotifier {
   List<Factura> _facturas = [];
   Map<int, Cliente> _clientes = {};
