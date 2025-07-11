@@ -6,6 +6,7 @@ import '../models/cliente.dart';
 import '../models/factura.dart';
 import '../models/producto.dart';
 import 'detalle_venta_screen.dart';
+import '../screens/historial_abonos_screen.dart';
 
 class CreditosScreen extends StatelessWidget {
   const CreditosScreen({super.key});
@@ -24,7 +25,23 @@ class CreditosScreen extends StatelessWidget {
     final hoy = DateTime.now();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Créditos Pendientes')),
+      appBar: AppBar(
+        title: const Text('Créditos Pendientes'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history),
+            tooltip: 'Ver historial de abonos',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const HistorialAbonosScreen(),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
       body: creditos.isEmpty
           ? const Center(child: Text('No hay créditos pendientes.'))
           : ListView.builder(

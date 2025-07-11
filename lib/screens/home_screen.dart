@@ -6,9 +6,7 @@ import 'ventas_screen.dart';
 import 'cargue_screen.dart';
 import 'cargue_historial_screen.dart';
 import 'cierre_dia_screen.dart';
-
-import '../db/db_helper.dart';
-
+//import '../db/db_helper.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -143,7 +141,7 @@ class HomeScreen extends StatelessWidget {
             ),
 
 
-            ElevatedButton.icon(
+            /*ElevatedButton.icon( // boton para pruebas
               onPressed: () async {
                 final db = await DBHelper.initDb();
                 final tablas = await db.rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
@@ -153,8 +151,8 @@ class HomeScreen extends StatelessWidget {
                 }
               },
               icon: Icon(Icons.search),
-              label: Text('Verificar Tablas DB'),
-            ),
+              label: Text('Verificar Tablas de datos DB'),
+            ),*/
 
           ],
         ),

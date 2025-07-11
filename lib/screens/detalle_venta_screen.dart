@@ -7,6 +7,7 @@ import '../models/producto.dart';
 import '../models/cliente.dart';
 import '../utils/pdf_generator.dart';
 import '../db/db_helper.dart';
+import '../models/abono.dart';
 
 class DetalleVentaScreen extends StatelessWidget {
   final Factura factura;
@@ -63,6 +64,15 @@ class DetalleVentaScreen extends StatelessWidget {
               );
 
               await DBHelper.actualizarFactura(facturaActualizada);
+
+              //Guardar el abono en la nueva tabla
+              final abonoModel = Abono(
+                facturaId: factura.id!,
+                monto: abono,
+                fecha: DateTime.now(),
+              );
+
+              await DBHelper.insertarAbono(abonoModel);
 
               Navigator.pop(context);
               Navigator.pop(context); // Cierra esta pantalla
@@ -130,6 +140,15 @@ class DetalleVentaScreen extends StatelessWidget {
               );
 
               await DBHelper.actualizarFactura(facturaActualizada);
+
+              if (abono > 0) {//para guardar en la tabla abonos
+                final nuevoAbono = Abono(
+                  facturaId: factura.id!,
+                  monto: abono,
+                  fecha: DateTime.now(),
+                );
+                await DBHelper.insertarAbono(nuevoAbono);
+              }
 
               Navigator.pop(context);
               Navigator.pop(context); // Cierra esta pantalla

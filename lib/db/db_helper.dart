@@ -8,6 +8,8 @@ import '../models/cliente.dart';
 import '../models/factura.dart';
 import '../models/detalle_factura.dart';
 import '../models/cargue.dart';
+import '../models/abono.dart';
+
 
 class DBHelper {
   static Database? _db;
@@ -307,4 +309,30 @@ class DBHelper {
       });
     }
   }
+
+  //ABONOS
+  // Insertar un nuevo abono
+  static Future<void> insertarAbono(Abono abono) async {
+    final db = await initDb();
+    await db.insert('abono', abono.toMap());
+  }
+  // Obtener abonos por fecha
+  static Future<List<Abono>> obtenerAbonosPorFecha(DateTime fecha) async {
+    final db = await initDb();
+    final fechaStr = fecha.toIso8601String().substring(0, 10); // yyyy-MM-dd
+    final maps = await db.query(
+      'abono',
+      where: "DATE(fecha) = ?",
+      whereArgs: [fechaStr],
+    );
+    return maps.map((e) => Abono.fromMap(e)).toList();
+  }
+  // obtener todos los abonos
+  static Future<List<Abono>> obtenerTodosLosAbonos() async {
+    final db = await initDb();
+    final maps = await db.query('abono');
+    return maps.map((e) => Abono.fromMap(e)).toList();
+  }
+
+
 }
