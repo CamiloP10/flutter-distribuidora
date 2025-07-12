@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/cierre_dia_provider.dart';
+import '../utils/pdf_generator.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:intl/intl.dart';
 
 class CierreDiaScreen extends StatefulWidget {
   const CierreDiaScreen({super.key});
@@ -20,6 +25,7 @@ class _CierreDiaScreenState extends State<CierreDiaScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<CierreDiaProvider>(context);
+    final currencyFormat = NumberFormat('#,##0', 'es_CO');
 
     return Scaffold(
       appBar: AppBar(title: const Text('Cierre del Día')),
@@ -30,6 +36,41 @@ class _CierreDiaScreenState extends State<CierreDiaScreen> {
         children: [
           _buildFechaSelector(context, provider),
           const SizedBox(height: 16),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.picture_as_pdf),
+            label: const Text('Generar PDF'),
+            onPressed: () async {
+              final detalleFacturas = provider.facturasDelDia.map((f) {
+                return {
+                  'id': f.id,
+                  'cliente': provider.nombresClientes[f.clienteId] ?? 'No registrado',
+                  'total': f.total ?? 0,
+                };
+              }).toList();
+
+              final pdf = await PdfGenerator.generarCierreDiaPDF(
+                fecha: provider.fechaSeleccionada,
+                totalFacturas: provider.totalFacturas,
+                totalPagado: provider.totalPagado,
+                totalCredito: provider.totalCredito,
+                totalVentas: provider.totalVentas,
+                totalAbonos: provider.totalAbonosDelDia,
+                detalleFacturas: detalleFacturas,
+                abonosDetallados: provider.abonosDetallados,
+              );
+
+              final dir = await getTemporaryDirectory();
+              final file = File('${dir.path}/cierre_${provider.fechaSeleccionada.toIso8601String().substring(0, 10)}.pdf');
+              await file.writeAsBytes(pdf);
+
+              await Share.shareXFiles(
+                [XFile(file.path)],
+                text: 'Cierre del día ${provider.fechaSeleccionada.day}/${provider.fechaSeleccionada.month}',
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+
           ExpansionTile(
             leading: const Icon(Icons.receipt_long, color: Colors.teal),
             title: const Text(
@@ -46,7 +87,7 @@ class _CierreDiaScreenState extends State<CierreDiaScreen> {
             ]
                 : provider.facturasDelDia.map((f) {
               final cliente = provider.nombresClientes[f.clienteId] ?? 'No registrado';
-              final monto = f.total?.toStringAsFixed(0) ?? '0';
+              final monto = currencyFormat.format(f.total ?? 0);
 
               return ListTile(
                 title: Text('Fact #${f.id} - $cliente'),
@@ -54,9 +95,9 @@ class _CierreDiaScreenState extends State<CierreDiaScreen> {
               );
             }).toList(),
           ),
-          _buildResumenCard('Total Recibido', '\$${provider.totalPagado.toStringAsFixed(0)}', Icons.attach_money),
-          _buildResumenCard('Total Créditos', '\$${provider.totalCredito.toStringAsFixed(0)}', Icons.credit_card),
-          _buildResumenCard('Total Venta del Día', '\$${provider.totalVentas.toStringAsFixed(0)}', Icons.bar_chart),
+          _buildResumenCard('Total Recibido', '\$${currencyFormat.format(provider.totalPagado)}', Icons.attach_money),
+          _buildResumenCard('Total Créditos', '\$${currencyFormat.format(provider.totalCredito)}', Icons.credit_card),
+          _buildResumenCard('Total Venta del Día', '\$${currencyFormat.format(provider.totalVentas)}', Icons.bar_chart),
           const Divider(height: 32, thickness: 1.5),
           ExpansionTile(
             leading: const Icon(Icons.account_balance_wallet, color: Colors.teal),
@@ -64,7 +105,7 @@ class _CierreDiaScreenState extends State<CierreDiaScreen> {
               'Abonos a Créditos Anteriores',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
-            subtitle: Text('\$${provider.totalAbonosDelDia.toStringAsFixed(0)}'),
+            subtitle: Text('\$${currencyFormat.format(provider.totalAbonosDelDia)}'),
             children: provider.abonosDetallados.isEmpty
                 ? [
               const Padding(
@@ -76,7 +117,7 @@ class _CierreDiaScreenState extends State<CierreDiaScreen> {
               return ListTile(
                 title: Text('Fact #${ab['facturaId']} - ${ab['cliente']}'),
                 trailing: Text(
-                  '\$${(ab['monto'] as double).toStringAsFixed(0)}',
+                  '\$${currencyFormat.format(ab['monto'])}',
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               );

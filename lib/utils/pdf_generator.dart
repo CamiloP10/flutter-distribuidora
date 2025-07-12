@@ -237,6 +237,62 @@ class PdfGenerator {
     );
     return pdf.save();
   }
+  //para el cierre
+  static Future<Uint8List> generarCierreDiaPDF({
+    required DateTime fecha,
+    required int totalFacturas,
+    required double totalPagado,
+    required double totalCredito,
+    required double totalVentas,
+    required double totalAbonos,
+    required List<Map<String, dynamic>> detalleFacturas,
+    required List<Map<String, dynamic>> abonosDetallados,
+  }) async {
+    final pdf = pw.Document();
+    final format = DateFormat('dd/MM/yyyy');
+    final money = NumberFormat('#,##0', 'es_CO');
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat(58 * PdfPageFormat.mm, PdfPageFormat.a4.height),
+        margin: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+        build: (context) => [
+          pw.Center(child: pw.Text('CIERRE DE VENTAS', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))),
+          pw.Center(child: pw.Text('Fecha: ${format.format(fecha)}', style: const pw.TextStyle(fontSize: 9))),
+          pw.Divider(),
+          pw.Text('Total Facturas: $totalFacturas', style: const pw.TextStyle(fontSize: 9)),
+          pw.Text('Total Venta del Día: \$${money.format(totalVentas)}', style: const pw.TextStyle(fontSize: 9)),
+          pw.Text('Total Recibido: \$${money.format(totalPagado)}', style: const pw.TextStyle(fontSize: 9)),
+          pw.Text('Total Créditos: \$${money.format(totalCredito)}', style: const pw.TextStyle(fontSize: 9)),
+          pw.SizedBox(height: 6),
+          pw.Text('Detalle de Facturas:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
+          ...detalleFacturas.map((f) => pw.Text(
+            '[  ]Fact #${f['id']} - ${f['cliente']}: \$${money.format(f['total'])}',
+            style: const pw.TextStyle(fontSize: 8),
+          )),
+
+          pw.SizedBox(height: 6),
+          pw.Text('Abonos a Créditos Anteriores:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
+          pw.Text('Total Abonos: \$${money.format(totalAbonos)}', style: const pw.TextStyle(fontSize: 9)),
+          if (abonosDetallados.isNotEmpty)
+            ...abonosDetallados.map((a) => pw.Text(
+              'Fact #${a['facturaId']} - ${a['cliente']}: \$${money.format(a['monto'])}',
+              style: const pw.TextStyle(fontSize: 8),
+            )),
+          pw.SizedBox(height: 8),
+          pw.Text('Observaciones:', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+          pw.SizedBox(height: 16),
+          pw.Text('_______________________________', style: pw.TextStyle(fontSize: 8)),
+          pw.SizedBox(height: 10),
+          pw.Text('_______________________________', style: pw.TextStyle(fontSize: 8)),
+          pw.SizedBox(height: 10),
+          pw.Divider(),
+        ],
+      ),
+    );
+    return pdf.save();
+  }
+
 
   static Future<pw.ImageProvider> _cargarLogo() async {
     final data = await rootBundle.load('assets/icon.png');
@@ -253,4 +309,5 @@ class PdfGenerator {
   static String formatearNumero(double numero) {
     return numero % 1 == 0 ? numero.toInt().toString() : numero.toString();
   }
+
 }
