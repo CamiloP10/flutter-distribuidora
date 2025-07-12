@@ -5,6 +5,7 @@ import '../models/factura.dart';
 class CierreDiaProvider extends ChangeNotifier {
   DateTime fechaSeleccionada = DateTime.now();
   List<Factura> facturasDelDia = [];
+  List<Map<String, dynamic>> abonosDetallados = []; //cada item tendrá: facturaId, cliente, monto
 
   int totalFacturas = 0;
   double totalPagado = 0;
@@ -59,7 +60,38 @@ class CierreDiaProvider extends ChangeNotifier {
         .where((ab) => !facturaIdsHoy.contains(ab.facturaId))
         .toList();
 
-    totalAbonosDelDia = abonosFacturasAnteriores.fold(0.0, (sum, a) => sum + a.monto);
+    // Reiniciar valores
+    totalAbonosDelDia = 0;
+    abonosDetallados = [];
+
+// Iterar sobre abonos válidos
+    for (final ab in abonosFacturasAnteriores) {
+      try {
+        final factura = await DBHelper.obtenerFacturaPorId(ab.facturaId);
+
+        if (factura.clienteId == null) {
+          print('La factura ${factura.id} no tiene cliente asignado');
+          continue;
+        }
+
+        if (factura.clienteId == null) {
+          print('La factura ${factura.id} no tiene cliente asignado');
+          continue;
+        }
+
+        final cliente = await DBHelper.obtenerClientePorId(factura.clienteId!);
+
+        abonosDetallados.add({
+          'facturaId': ab.facturaId,
+          'cliente': cliente.nombre, // ✅ ahora sí está definida la variable
+          'monto': ab.monto,
+        });
+
+        totalAbonosDelDia += ab.monto;
+      } catch (e) {
+        print('❌ Error al obtener datos de abono: $e');
+      }
+    }
 
     // 4. Recaudo total = pagado por facturas del día (puedes separar efectivo/transferencia luego)
     totalRecaudo = totalPagado;

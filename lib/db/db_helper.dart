@@ -334,5 +334,19 @@ class DBHelper {
     return maps.map((e) => Abono.fromMap(e)).toList();
   }
 
+  //para los cierres
+  static Future<Factura> obtenerFacturaPorId(int id) async {
+    final db = await initDb();
+    final maps = await db.query('factura', where: 'id = ?', whereArgs: [id]);
+    if (maps.isEmpty) throw Exception('Factura no encontrada');
+    return Factura.fromMap(maps.first);
+  }
+
+  static Future<Cliente> obtenerClientePorId(int id) async {
+    final db = await initDb();
+    final maps = await db.query('cliente', where: 'id = ?', whereArgs: [id]);
+    if (maps.isEmpty) throw Exception('Cliente no encontrado');
+    return Cliente.fromMap(maps.first);
+  }
 
 }

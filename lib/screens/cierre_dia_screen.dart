@@ -35,7 +35,30 @@ class _CierreDiaScreenState extends State<CierreDiaScreen> {
           _buildResumenCard('Total Créditos', '\$${provider.totalCredito.toStringAsFixed(0)}', Icons.credit_card),
           _buildResumenCard('Total Venta del Día', '\$${provider.totalVentas.toStringAsFixed(0)}', Icons.bar_chart),
           const Divider(height: 32, thickness: 1),
-          _buildResumenCard('Abonos a Créditos Anteriores', '\$${provider.totalAbonosDelDia.toStringAsFixed(0)}', Icons.account_balance_wallet),
+          ExpansionTile(
+            leading: const Icon(Icons.account_balance_wallet, color: Colors.teal),
+            title: const Text(
+              'Abonos a Créditos Anteriores',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text('\$${provider.totalAbonosDelDia.toStringAsFixed(0)}'),
+            children: provider.abonosDetallados.isEmpty
+                ? [
+              const Padding(
+                padding: EdgeInsets.all(8.0),
+                child: Text('No se registraron abonos a créditos anteriores.'),
+              )
+            ]
+                : provider.abonosDetallados.map((ab) {
+              return ListTile(
+                title: Text('Fact #${ab['facturaId']} - ${ab['cliente']}'),
+                trailing: Text(
+                  '\$${(ab['monto'] as double).toStringAsFixed(0)}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+              );
+            }).toList(),
+          ),
         ],
       ),
     );
