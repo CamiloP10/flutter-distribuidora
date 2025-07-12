@@ -30,11 +30,34 @@ class _CierreDiaScreenState extends State<CierreDiaScreen> {
         children: [
           _buildFechaSelector(context, provider),
           const SizedBox(height: 16),
-          _buildResumenCard('Total de Facturas', provider.totalFacturas.toString(), Icons.receipt_long),
+          ExpansionTile(
+            leading: const Icon(Icons.receipt_long, color: Colors.teal),
+            title: const Text(
+              'Total de Facturas',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text('${provider.totalFacturas} facturas'),
+            children: provider.facturasDelDia.isEmpty
+                ? [
+              const Padding(
+                padding: EdgeInsets.all(8.0),
+                child: Text('No hay facturas registradas en esta fecha.'),
+              )
+            ]
+                : provider.facturasDelDia.map((f) {
+              final cliente = provider.nombresClientes[f.clienteId] ?? 'No registrado';
+              final monto = f.total?.toStringAsFixed(0) ?? '0';
+
+              return ListTile(
+                title: Text('Fact #${f.id} - $cliente'),
+                trailing: Text('\$$monto'),
+              );
+            }).toList(),
+          ),
           _buildResumenCard('Total Recibido', '\$${provider.totalPagado.toStringAsFixed(0)}', Icons.attach_money),
           _buildResumenCard('Total Créditos', '\$${provider.totalCredito.toStringAsFixed(0)}', Icons.credit_card),
           _buildResumenCard('Total Venta del Día', '\$${provider.totalVentas.toStringAsFixed(0)}', Icons.bar_chart),
-          const Divider(height: 32, thickness: 1),
+          const Divider(height: 32, thickness: 1.5),
           ExpansionTile(
             leading: const Icon(Icons.account_balance_wallet, color: Colors.teal),
             title: const Text(

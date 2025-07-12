@@ -6,6 +6,7 @@ class CierreDiaProvider extends ChangeNotifier {
   DateTime fechaSeleccionada = DateTime.now();
   List<Factura> facturasDelDia = [];
   List<Map<String, dynamic>> abonosDetallados = []; //cada item tendrá: facturaId, cliente, monto
+  Map<int, String> nombresClientes = {};
 
   int totalFacturas = 0;
   double totalPagado = 0;
@@ -48,6 +49,13 @@ class CierreDiaProvider extends ChangeNotifier {
       if ((f.estadoPago ?? '').toLowerCase() == 'crédito') {
         totalCredito += f.saldoPendiente ?? 0;
       }
+    }
+
+    nombresClientes = {}; // limpiar mapa
+
+    final todosClientes = await DBHelper.obtenerClientes();
+    for (final c in todosClientes) {
+      nombresClientes[c.id!] = c.nombre;
     }
 
     // 2. Obtener todos los abonos realizados en esa fecha
