@@ -27,10 +27,11 @@ class CierreDiaProvider extends ChangeNotifier {
     final db = await DBHelper.initDb();
     final fechaStr = fechaSeleccionada.toIso8601String().substring(0, 10); // YYYY-MM-DD
 
+    // 1. Obtener facturas creadas en la fecha seleccionada
     final data = await db.rawQuery('''
-      SELECT * FROM factura
-      WHERE DATE(fecha) = ?
-    ''', [fechaStr]);
+    SELECT * FROM factura
+    WHERE DATE(fecha) = ?
+  ''', [fechaStr]);
 
     facturasDelDia = data.map((e) => Factura.fromMap(e)).toList();
 
@@ -42,32 +43,26 @@ class CierreDiaProvider extends ChangeNotifier {
     for (var f in facturasDelDia) {
       totalPagado += f.pagado ?? 0;
       totalVentas += f.total ?? 0;
+
       if ((f.estadoPago ?? '').toLowerCase() == 'crédito') {
         totalCredito += f.saldoPendiente ?? 0;
       }
     }
 
-    // Buscar abonos realizados en el día seleccionado, aunque sean de facturas anteriores
-    totalAbonosDelDia = 0;
+    // 2. Obtener todos los abonos realizados en esa fecha
+    final abonosDelDia = await DBHelper.obtenerAbonosPorFecha(fechaSeleccionada);
 
-    for (var factura in facturasDelDia) {
-      final info = (factura.informacion ?? '').toLowerCase();
+    // 3. Excluir abonos a facturas creadas hoy (para evitar doble conteo)
+    final facturaIdsHoy = facturasDelDia.map((f) => f.id).toSet();
 
-      // Buscar todos los abonos con fechas
-      final matches = RegExp(r'abono \$?([\d,\.]+) el (\d{4}-\d{2}-\d{2})').allMatches(info);
+    final abonosFacturasAnteriores = abonosDelDia
+        .where((ab) => !facturaIdsHoy.contains(ab.facturaId))
+        .toList();
 
-      for (var match in matches) {
-        final montoTexto = match.group(1)!.replaceAll('.', '').replaceAll(',', '');
-        final fechaAbono = match.group(2)!;
+    totalAbonosDelDia = abonosFacturasAnteriores.fold(0.0, (sum, a) => sum + a.monto);
 
-        if (fechaAbono == fechaStr) {
-          final monto = double.tryParse(montoTexto) ?? 0;
-          totalAbonosDelDia += monto;
-        }
-      }
-    }
-
-    totalRecaudo = totalPagado; // por ahora igual (sin separar efectivo/transf)
+    // 4. Recaudo total = pagado por facturas del día (puedes separar efectivo/transferencia luego)
+    totalRecaudo = totalPagado;
 
     isLoading = false;
     notifyListeners();

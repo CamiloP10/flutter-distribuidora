@@ -34,7 +34,8 @@ class _CierreDiaScreenState extends State<CierreDiaScreen> {
           _buildResumenCard('Total Recibido', '\$${provider.totalPagado.toStringAsFixed(0)}', Icons.attach_money),
           _buildResumenCard('Total Créditos', '\$${provider.totalCredito.toStringAsFixed(0)}', Icons.credit_card),
           _buildResumenCard('Total Venta del Día', '\$${provider.totalVentas.toStringAsFixed(0)}', Icons.bar_chart),
-
+          const Divider(height: 32, thickness: 1),
+          _buildResumenCard('Abonos a Créditos Anteriores', '\$${provider.totalAbonosDelDia.toStringAsFixed(0)}', Icons.account_balance_wallet),
         ],
       ),
     );
