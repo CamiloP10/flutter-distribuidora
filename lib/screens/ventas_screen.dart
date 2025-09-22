@@ -19,7 +19,7 @@ class _VentasScreenState extends State<VentasScreen> {
   final NumberFormat currencyFormat = NumberFormat('#,##0', 'es_CO');
   final TextEditingController _searchController = TextEditingController();
   final DateTime _fechaPorDefecto =
-  DateTime.now().subtract(const Duration(days: 3));
+  DateTime.now().subtract(const Duration(days: 2));
 
   String _estadoPagoSeleccionado = 'Todos';
   DateTimeRange? _rangoFechas;
