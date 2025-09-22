@@ -348,5 +348,4 @@ class DBHelper {
     if (maps.isEmpty) throw Exception('Cliente no encontrado');
     return Cliente.fromMap(maps.first);
   }
-
 }
