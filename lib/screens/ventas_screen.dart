@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+
 import '../providers/ventas_provider.dart';
 import '../screens/detalle_venta_screen.dart';
 import '../models/cliente.dart';
@@ -17,7 +18,8 @@ class VentasScreen extends StatefulWidget {
 class _VentasScreenState extends State<VentasScreen> {
   final NumberFormat currencyFormat = NumberFormat('#,##0', 'es_CO');
   final TextEditingController _searchController = TextEditingController();
-  final DateTime _fechaPorDefecto = DateTime.now().subtract(const Duration(days: 3)); // filtra facturas por X dias y los muestra por defecto
+  final DateTime _fechaPorDefecto =
+  DateTime.now().subtract(const Duration(days: 2));
 
   String _estadoPagoSeleccionado = 'Todos';
   DateTimeRange? _rangoFechas;
@@ -26,8 +28,11 @@ class _VentasScreenState extends State<VentasScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final ventasProvider = Provider.of<VentasProvider>(context, listen: false);
-      ventasProvider.cargarDatos();
+      final ventasProvider =
+      Provider.of<VentasProvider>(context, listen: false);
+      ventasProvider.cargarFacturas();
+      ventasProvider.cargarClientes();
+      ventasProvider.cargarProductos();
     });
   }
 
@@ -41,6 +46,7 @@ class _VentasScreenState extends State<VentasScreen> {
       );
     }
 
+    // 📌 Filtrar facturas según criterios
     final facturas = ventasProvider.facturas.where((factura) {
       final cliente = ventasProvider.getCliente(factura.clienteId);
       final query = _searchController.text.toLowerCase();
@@ -53,11 +59,14 @@ class _VentasScreenState extends State<VentasScreen> {
           factura.estadoPago.toLowerCase().trim() ==
               _estadoPagoSeleccionado.toLowerCase().trim();
 
-      final estaFiltrando = _searchController.text.isNotEmpty || _estadoPagoSeleccionado != 'Todos';
+      final estaFiltrando = _searchController.text.isNotEmpty ||
+          _estadoPagoSeleccionado != 'Todos';
 
       final coincideFecha = _rangoFechas != null
-          ? (factura.fecha.isAfter(_rangoFechas!.start.subtract(const Duration(days: 1))) &&
-          factura.fecha.isBefore(_rangoFechas!.end.add(const Duration(days: 1))))
+          ? (factura.fecha
+          .isAfter(_rangoFechas!.start.subtract(const Duration(days: 1))) &&
+          factura.fecha.isBefore(
+              _rangoFechas!.end.add(const Duration(days: 1))))
           : (estaFiltrando ? true : factura.fecha.isAfter(_fechaPorDefecto));
 
       return coincideBusqueda && coincideEstado && coincideFecha;
@@ -68,11 +77,7 @@ class _VentasScreenState extends State<VentasScreen> {
         title: const Text('Historial de Ventas'),
         actions: [
           IconButton(
-            icon: const Icon(
-                Icons.list_alt,
-                size: 32,
-                color: Colors.red,
-            ),
+            icon: const Icon(Icons.list_alt, size: 32, color: Colors.red),
             tooltip: 'Ver Créditos Antiguos',
             onPressed: () {
               Navigator.push(
@@ -83,9 +88,9 @@ class _VentasScreenState extends State<VentasScreen> {
           ),
         ],
       ),
-
       body: Column(
         children: [
+          // 🔎 Barra de búsqueda y filtros
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Wrap(
@@ -101,9 +106,7 @@ class _VentasScreenState extends State<VentasScreen> {
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.search),
                     ),
-                    onChanged: (_) {
-                      setState(() {});
-                    },
+                    onChanged: (_) => setState(() {}),
                   ),
                 ),
                 SizedBox(
@@ -122,9 +125,7 @@ class _VentasScreenState extends State<VentasScreen> {
                         .toList(),
                     onChanged: (value) {
                       if (value != null) {
-                        setState(() {
-                          _estadoPagoSeleccionado = value;
-                        });
+                        setState(() => _estadoPagoSeleccionado = value);
                       }
                     },
                   ),
@@ -143,9 +144,7 @@ class _VentasScreenState extends State<VentasScreen> {
                       initialDateRange: _rangoFechas,
                     );
                     if (picked != null) {
-                      setState(() {
-                        _rangoFechas = picked;
-                      });
+                      setState(() => _rangoFechas = picked);
                     }
                   },
                 ),
@@ -164,6 +163,7 @@ class _VentasScreenState extends State<VentasScreen> {
             ),
           ),
           const Divider(height: 1),
+          // 📜 Lista de facturas
           Expanded(
             child: facturas.isEmpty
                 ? const Center(child: Text('No se encontraron resultados.'))
@@ -171,10 +171,13 @@ class _VentasScreenState extends State<VentasScreen> {
               itemCount: facturas.length,
               itemBuilder: (context, index) {
                 final f = facturas[index];
-                final Cliente? cliente = ventasProvider.getCliente(f.clienteId);
-                final Map<int, Producto> productosMap = ventasProvider.productosMap;
+                final Cliente? cliente =
+                ventasProvider.getCliente(f.clienteId);
+                final Map<int, Producto> productosMap =
+                    ventasProvider.productosMap;
 
-                final esCredito = f.estadoPago.toLowerCase().contains('crédito');
+                final esCredito =
+                f.estadoPago.toLowerCase().contains('crédito');
 
                 return ListTile(
                   title: Text(
@@ -194,7 +197,6 @@ class _VentasScreenState extends State<VentasScreen> {
                         builder: (_) => DetalleVentaScreen(
                           factura: f,
                           cliente: cliente,
-                          detalles: ventasProvider.getDetalles(f.id!),
                           productosMap: productosMap,
                         ),
                       ),

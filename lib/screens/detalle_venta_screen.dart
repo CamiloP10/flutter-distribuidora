@@ -1,30 +1,50 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
-import '../models/factura.dart';
-import '../models/detalle_factura.dart';
-import '../models/producto.dart';
-import '../models/cliente.dart';
-import '../utils/pdf_generator.dart';
-import '../db/db_helper.dart';
+import 'package:provider/provider.dart';
 
-class DetalleVentaScreen extends StatelessWidget {
+import '../db/db_helper.dart';
+import '../models/abono.dart';
+import '../models/cliente.dart';
+import '../models/detalle_factura.dart';
+import '../models/factura.dart';
+import '../models/producto.dart';
+import '../providers/ventas_provider.dart';
+import '../utils/pdf_generator.dart';
+
+class DetalleVentaScreen extends StatefulWidget {
   final Factura factura;
   final Cliente? cliente;
-  final List<DetalleFactura> detalles;
   final Map<int, Producto> productosMap;
 
   const DetalleVentaScreen({
     Key? key,
     required this.factura,
     required this.cliente,
-    required this.detalles,
     required this.productosMap,
   }) : super(key: key);
 
-  void _mostrarDialogoAbono(BuildContext context) {
+  @override
+  State<DetalleVentaScreen> createState() => _DetalleVentaScreenState();
+}
+
+class _DetalleVentaScreenState extends State<DetalleVentaScreen> {
+  final currencyFormat = NumberFormat('#,##0', 'es_CO');
+
+  @override
+  void initState() {
+    super.initState();
+    final ventasProvider = Provider.of<VentasProvider>(context, listen: false);
+    ventasProvider.cargarDetallesFactura(widget.factura.id!);
+  }
+
+  Future<void> _actualizarFactura(Factura factura) async {
+    final ventasProvider = Provider.of<VentasProvider>(context, listen: false);
+    await ventasProvider.actualizarFactura(factura);
+  }
+
+  void _mostrarDialogoAbono(BuildContext context, Factura factura) {
     final TextEditingController abonoController = TextEditingController();
-    final currencyFormat = NumberFormat('#,##0', 'es_CO');
 
     showDialog(
       context: context,
@@ -43,14 +63,15 @@ class DetalleVentaScreen extends StatelessWidget {
           ElevatedButton(
             onPressed: () async {
               final abono = double.tryParse(abonoController.text) ?? 0;
-              if (abono < 0) return;
+              if (abono <= 0) return;
 
               final nuevoPagado = factura.pagado + abono;
               final nuevoSaldo = factura.total - nuevoPagado;
               final nuevoEstado = nuevoSaldo <= 0 ? 'Pagado' : 'Crédito';
 
               final ahora = DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
-              final observacionNueva = 'Abono \$${currencyFormat.format(abono)} el $ahora';
+              final observacionNueva =
+                  'Abono \$${currencyFormat.format(abono)} el $ahora';
               final nuevaInfo = factura.informacion.isEmpty
                   ? observacionNueva
                   : '${factura.informacion}\n$observacionNueva';
@@ -62,21 +83,16 @@ class DetalleVentaScreen extends StatelessWidget {
                 informacion: nuevaInfo,
               );
 
-              await DBHelper.actualizarFactura(facturaActualizada);
+              await _actualizarFactura(facturaActualizada);
 
-              Navigator.pop(context);
-              Navigator.pop(context); // Cierra esta pantalla
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => DetalleVentaScreen(
-                    factura: facturaActualizada,
-                    cliente: cliente,
-                    detalles: detalles,
-                    productosMap: productosMap,
-                  ),
-                ),
+              final abonoModel = Abono(
+                facturaId: factura.id!,
+                monto: abono,
+                fecha: DateTime.now(),
               );
+              await DBHelper.insertarAbono(abonoModel);
+
+              if (mounted) Navigator.pop(context);
             },
             child: const Text('Guardar'),
           ),
@@ -85,9 +101,9 @@ class DetalleVentaScreen extends StatelessWidget {
     );
   }
 
-  void _mostrarDialogoReversion(BuildContext context) {
-    final TextEditingController abonoController = TextEditingController(text: '0');
-    final currencyFormat = NumberFormat('#,##0', 'es_CO');
+  void _mostrarDialogoReversion(BuildContext context, Factura factura) {
+    final TextEditingController abonoController =
+    TextEditingController(text: '0');
 
     showDialog(
       context: context,
@@ -108,7 +124,7 @@ class DetalleVentaScreen extends StatelessWidget {
               final abono = double.tryParse(abonoController.text) ?? 0;
               if (abono < 0 || abono > factura.total) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('El abono debe ser mayor o igual a 0 y no puede superar el total')),
+                  const SnackBar(content: Text('El abono debe ser válido')),
                 );
                 return;
               }
@@ -116,7 +132,8 @@ class DetalleVentaScreen extends StatelessWidget {
               final nuevoSaldo = factura.total - abono;
 
               final ahora = DateFormat('dd/MM/yyyy HH:mm').format(DateTime.now());
-              final observacionNueva = 'Factura revertida a crédito con abono de \$${currencyFormat.format(abono)} el $ahora';
+              final observacionNueva =
+                  'Factura revertida a crédito con abono de \$${currencyFormat.format(abono)} el $ahora';
               final nuevaInfo = factura.informacion.isEmpty
                   ? observacionNueva
                   : '${factura.informacion}\n$observacionNueva';
@@ -129,21 +146,18 @@ class DetalleVentaScreen extends StatelessWidget {
                 informacion: nuevaInfo,
               );
 
-              await DBHelper.actualizarFactura(facturaActualizada);
+              await _actualizarFactura(facturaActualizada);
 
-              Navigator.pop(context);
-              Navigator.pop(context); // Cierra esta pantalla
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => DetalleVentaScreen(
-                    factura: facturaActualizada,
-                    cliente: cliente,
-                    detalles: detalles,
-                    productosMap: productosMap,
-                  ),
-                ),
-              );
+              if (abono > 0) {
+                final nuevoAbono = Abono(
+                  facturaId: factura.id!,
+                  monto: abono,
+                  fecha: DateTime.now(),
+                );
+                await DBHelper.insertarAbono(nuevoAbono);
+              }
+
+              if (mounted) Navigator.pop(context);
             },
             child: const Text('Guardar'),
           ),
@@ -152,13 +166,13 @@ class DetalleVentaScreen extends StatelessWidget {
     );
   }
 
-  void _mostrarDialogoAgregarProducto(BuildContext context) {
+  void _mostrarDialogoAgregarProducto(BuildContext context, Factura factura) {
     final TextEditingController cantidadCtrl = TextEditingController();
     final TextEditingController precioCtrl = TextEditingController();
     final TextEditingController productoCtrl = TextEditingController();
     Producto? productoSeleccionado;
 
-    final productosDisponibles = productosMap.values.toList();
+    final productosDisponibles = widget.productosMap.values.toList();
 
     showDialog(
       context: context,
@@ -178,24 +192,19 @@ class DetalleVentaScreen extends StatelessWidget {
                       suffixIcon: Icon(Icons.search),
                     ),
                     onTap: () async {
-                      final Producto? seleccionado = await showSearch<Producto>(
+                      final Producto? seleccionado =
+                      await showSearch<Producto>(
                         context: context,
                         delegate: ProductoSearchDelegate(productosDisponibles),
                       );
 
                       if (seleccionado != null) {
                         productoSeleccionado = seleccionado;
-                        productoCtrl.text = '${seleccionado.nombre} - ${seleccionado.presentacion}';
-                        precioCtrl.text = seleccionado.precio.toStringAsFixed(0);
+                        productoCtrl.text =
+                        '${seleccionado.nombre} - ${seleccionado.presentacion}';
+                        precioCtrl.text =
+                            seleccionado.precio.toStringAsFixed(0);
                         setState(() {});
-                      }
-
-                      if (seleccionado != null) {
-                        setState(() {
-                          productoSeleccionado = seleccionado;
-                          productoCtrl.text = '${seleccionado.nombre} - ${seleccionado.presentacion}';
-                          precioCtrl.text = seleccionado.precio.toStringAsFixed(0);
-                        });
                       }
                     },
                   ),
@@ -203,18 +212,23 @@ class DetalleVentaScreen extends StatelessWidget {
                   TextField(
                     controller: cantidadCtrl,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Cantidad'),
+                    decoration:
+                    const InputDecoration(labelText: 'Cantidad'),
                   ),
                   const SizedBox(height: 10),
                   TextField(
                     controller: precioCtrl,
-                    keyboardType: TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'Precio unitario'),
+                    keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                    decoration:
+                    const InputDecoration(labelText: 'Precio unitario'),
                   ),
                 ],
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+                TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancelar')),
                 ElevatedButton(
                   onPressed: () async {
                     if (productoSeleccionado == null) return;
@@ -233,39 +247,29 @@ class DetalleVentaScreen extends StatelessWidget {
                     await DBHelper.insertarDetallesFactura([nuevoDetalle]);
 
                     final nuevoTotal = factura.total + (cantidad * precio);
-                    // mantiene el estado pagado
                     final nuevoSaldo = factura.estadoPago.toLowerCase() == 'pagado'
-                        ? 0
-                        : nuevoTotal - factura.pagado;
+                        ? 0.0
+                        : (nuevoTotal - factura.pagado);
 
-                    final esPagado = factura.estadoPago.toLowerCase() == 'pagado';
+                    final esPagado =
+                        factura.estadoPago.toLowerCase() == 'pagado';
 
                     final facturaActualizada = factura.copyWith(
                       total: nuevoTotal,
                       pagado: esPagado ? nuevoTotal : factura.pagado,
-                      saldoPendiente: esPagado ? 0 : nuevoSaldo.toDouble(),
+                      saldoPendiente: nuevoSaldo,
                       estadoPago: factura.estadoPago,
                       tipoPago: factura.tipoPago,
-                      informacion: factura.estadoPago.toLowerCase() == 'pagado' ? '' : factura.informacion,
+                      informacion: factura.informacion,
                     );
 
-                    await DBHelper.actualizarFactura(facturaActualizada);
+                    await _actualizarFactura(facturaActualizada);
 
-                    if (context.mounted) {
-                      Navigator.pop(context); // Cierra el diálogo
-                      Navigator.pop(context); // Cierra la pantalla actual
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => DetalleVentaScreen(
-                            factura: facturaActualizada,
-                            cliente: cliente,
-                            detalles: [...detalles, nuevoDetalle],
-                            productosMap: productosMap,
-                          ),
-                        ),
-                      );
-                    }
+                    final ventasProvider =
+                    Provider.of<VentasProvider>(context, listen: false);
+                    await ventasProvider.cargarDetallesFactura(factura.id!);
+
+                    if (mounted) Navigator.pop(context);
                   },
                   child: const Text('Guardar'),
                 ),
@@ -279,8 +283,14 @@ class DetalleVentaScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final currencyFormat = NumberFormat('#,##0', 'es_CO');
-    final productosList = detalles.map((d) => productosMap[d.productoId]!).toList();
+    final ventasProvider = Provider.of<VentasProvider>(context);
+
+    // 🔑 obtener siempre la versión fresca de la factura
+    final factura = ventasProvider.facturas
+        .firstWhere((f) => f.id == widget.factura.id);
+
+    final detalles = ventasProvider.getDetallesFactura(factura.id!);
+    final productosMap = ventasProvider.productosMap;
 
     return Scaffold(
       appBar: AppBar(title: Text('Factura #${factura.id}')),
@@ -289,15 +299,18 @@ class DetalleVentaScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Cliente: ${cliente?.nombre ?? 'NR'} - ${DateFormat('dd/MM/yyyy HH:mm').format(factura.fecha)}'),
+            Text(
+                'Cliente: ${widget.cliente?.nombre ?? 'NR'} - ${DateFormat('dd/MM/yyyy HH:mm').format(factura.fecha)}'),
             Text('Estado de Pago: ${factura.estadoPago}'),
             Text('Total: \$${currencyFormat.format(factura.total)}'),
             Text('Pagado: \$${currencyFormat.format(factura.pagado)}'),
-            Text('Saldo Pendiente: \$${currencyFormat.format(factura.saldoPendiente)}; Tipo de Pago: ${factura.tipoPago}'),
+            Text(
+                'Saldo Pendiente: \$${currencyFormat.format(factura.saldoPendiente)}; Tipo de Pago: ${factura.tipoPago}'),
             if (factura.informacion.isNotEmpty)
               Text('Observaciones: ${factura.informacion}'),
 
-            if (factura.estadoPago.toLowerCase() == 'crédito' || factura.estadoPago.toLowerCase() == 'pagado')
+            if (factura.estadoPago.toLowerCase() == 'crédito' ||
+                factura.estadoPago.toLowerCase() == 'pagado')
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 child: Row(
@@ -307,35 +320,45 @@ class DetalleVentaScreen extends StatelessWidget {
                       icon: const Icon(Icons.picture_as_pdf),
                       label: const Text('Generar PDF'),
                       onPressed: () async {
-                        final clienteFinal = cliente ?? Cliente(id: 0, nombre: 'NR', telefono: '', informacion: '');
+                        final clienteFinal = widget.cliente ??
+                            Cliente(
+                                id: 0,
+                                nombre: 'NR',
+                                telefono: '',
+                                informacion: '');
                         final pdfBytes = await PdfGenerator.generarFacturaPDF(
                           factura: factura,
                           cliente: clienteFinal,
                           detalles: detalles,
-                          productos: productosList,
+                          productos: productosMap.values.toList(),
                         );
-                        await Printing.sharePdf(bytes: pdfBytes, filename: 'Factura_${factura.id}.pdf');
+                        await Printing.sharePdf(
+                            bytes: pdfBytes,
+                            filename: 'Factura_${factura.id}.pdf');
                       },
                     ),
                     if (factura.estadoPago.toLowerCase() == 'crédito')
                       ElevatedButton.icon(
                         icon: const Icon(Icons.attach_money),
                         label: const Text('Registrar Abono'),
-                        onPressed: () => _mostrarDialogoAbono(context),
+                        onPressed: () => _mostrarDialogoAbono(context, factura),
                       ),
                     if (factura.estadoPago.toLowerCase() == 'pagado')
                       ElevatedButton.icon(
                         icon: const Icon(Icons.undo),
                         label: const Text('Revertir a Crédito'),
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-                        onPressed: () => _mostrarDialogoReversion(context),
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.redAccent),
+                        onPressed: () =>
+                            _mostrarDialogoReversion(context, factura),
                       ),
                   ],
                 ),
               ),
 
             const SizedBox(height: 10),
-            const Text('Productos:', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text('Productos:',
+                style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 5),
             Expanded(
               child: ListView.builder(
@@ -381,7 +404,7 @@ class DetalleVentaScreen extends StatelessWidget {
                 icon: const Icon(Icons.add),
                 label: const Text('Agregar Item'),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
-                onPressed: () => _mostrarDialogoAgregarProducto(context),
+                onPressed: () => _mostrarDialogoAgregarProducto(context, factura),
               ),
             ),
             const SizedBox(height: 5),
@@ -390,6 +413,7 @@ class DetalleVentaScreen extends StatelessWidget {
       ),
     );
   }
+
   String formatearCantidad(double cantidad) {
     return cantidad % 1 == 0 ? cantidad.toInt().toString() : cantidad.toString();
   }
@@ -401,16 +425,22 @@ class ProductoSearchDelegate extends SearchDelegate<Producto> {
   ProductoSearchDelegate(this.productos);
 
   @override
-  List<Widget>? buildActions(BuildContext context) => [
-    IconButton(icon: const Icon(Icons.clear), onPressed: () => query = ''),
-  ];
+  List<Widget>? buildActions(BuildContext context) =>
+      [IconButton(icon: const Icon(Icons.clear), onPressed: () => query = '')];
 
   @override
-  Widget? buildLeading(BuildContext context) =>
-      IconButton(
-        icon: const Icon(Icons.arrow_back),
-        onPressed: () => close(context, Producto(id: 0, codigo: '', nombre: '', presentacion: '', cantidad: 0, precio: 0)),
-      );
+  Widget? buildLeading(BuildContext context) => IconButton(
+    icon: const Icon(Icons.arrow_back),
+    onPressed: () => close(
+        context,
+        Producto(
+            id: 0,
+            codigo: '',
+            nombre: '',
+            presentacion: '',
+            cantidad: 0,
+            precio: 0)),
+  );
 
   @override
   Widget buildResults(BuildContext context) => _buildSuggestions();
@@ -419,9 +449,11 @@ class ProductoSearchDelegate extends SearchDelegate<Producto> {
   Widget buildSuggestions(BuildContext context) => _buildSuggestions();
 
   Widget _buildSuggestions() {
-    final sugerencias = productos.where((p) =>
+    final sugerencias = productos
+        .where((p) =>
     p.presentacion.toLowerCase().contains(query.toLowerCase()) ||
-        p.nombre.toLowerCase().contains(query.toLowerCase())).toList();
+        p.nombre.toLowerCase().contains(query.toLowerCase()))
+        .toList();
 
     return ListView.builder(
       itemCount: sugerencias.length,

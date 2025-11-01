@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/producto.dart';
 import '../providers/producto_provider.dart';
+import '../providers/ventas_provider.dart';
 
 class AgregarProductoScreen extends StatefulWidget {
   final Producto? producto; // null si es nuevo
@@ -29,7 +30,7 @@ class _AgregarProductoScreenState extends State<AgregarProductoScreen> {
     }
   }
 
-  void guardarProducto() async {
+  Future<void> guardarProducto() async {
     final producto = Producto(
       id: widget.producto?.id, // conservar el ID si se está editando
       codigo: widget.producto?.codigo ?? 'P${DateTime.now().millisecondsSinceEpoch}',
@@ -40,12 +41,16 @@ class _AgregarProductoScreenState extends State<AgregarProductoScreen> {
     );
 
     final productoProvider = context.read<ProductoProvider>();
+    final ventasProvider = context.read<VentasProvider>();
 
     if (widget.producto != null) {
       await productoProvider.actualizarProducto(producto);
     } else {
       await productoProvider.agregarProducto(producto);
     }
+
+    // Sincronizar también en VentasProvider
+    await ventasProvider.cargarProductos();
 
     Navigator.pop(context, true); // Regresa a pantalla anterior con éxito
   }

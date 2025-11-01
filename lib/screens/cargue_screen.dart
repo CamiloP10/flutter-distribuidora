@@ -1,14 +1,18 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/cargue.dart';
-import '../providers/ventas_provider.dart';
-import '../providers/cliente_provider.dart';
-import '../models/cliente.dart';
-import 'dart:io';
+import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import '../db/db_helper.dart';
+import '../models/cargue.dart';
+import '../models/factura.dart';
+import '../models/detalle_factura.dart';
+import '../models/cliente.dart';
+import '../models/producto.dart';
+import '../providers/ventas_provider.dart';
+import '../providers/cliente_provider.dart';
+import '../providers/producto_provider.dart';
 import '../utils/pdf_generator.dart';
-import 'package:share_plus/share_plus.dart';
 
 int generarIdCortoUnico() {
   final timestamp = DateTime.now().millisecondsSinceEpoch;
@@ -34,9 +38,10 @@ class _CargueScreenState extends State<CargueScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final ventasProvider = Provider.of<VentasProvider>(context, listen: false);
-      ventasProvider.cargarDatos();
+      await ventasProvider.cargarFacturas();
+      await ventasProvider.cargarCargues();
     });
   }
 
@@ -191,11 +196,25 @@ class _CargueScreenState extends State<CargueScreen> {
                                 await DBHelper.insertarCargue(nuevoCargue);
 
                                 final clienteProvider = Provider.of<ClienteProvider>(context, listen: false);
+                                // 🔹 Obtener detalles de cada factura seleccionada
+                                List<DetalleFactura> detallesSeleccionados = [];
+                                for (var id in facturasSeleccionadas) {
+                                  final dets = await ventasProvider.cargarDetallesFactura(id);
+                                  detallesSeleccionados.addAll(dets);
+                                }
+
+                                // 🔹 Obtener productos desde ProductoProvider
+                                final productoProvider = Provider.of<ProductoProvider>(context, listen: false);
+                                final productos = productoProvider.productos;
+
+                                // 🔹 Generar PDF
                                 final pdfBytes = await PdfGenerator.generarCarguePDF(
                                   cargue: nuevoCargue,
-                                  facturas: ventasProvider.facturas,
-                                  detalles: ventasProvider.getAllDetalles(),
-                                  productos: ventasProvider.productosMap.values.toList(),
+                                  facturas: ventasProvider.facturas
+                                      .where((f) => facturasSeleccionadas.contains(f.id))
+                                      .toList(),
+                                  detalles: detallesSeleccionados,
+                                  productos: productos,
                                   clientes: clienteProvider.clientesMap,
                                 );
 

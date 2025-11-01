@@ -7,6 +7,12 @@ class ProductoProvider with ChangeNotifier {
 
   List<Producto> get productos => _productos;
 
+  // 👇 Nuevo: acceso rápido por id
+  Map<int, Producto> get productosMap => {
+    for (var p in _productos)
+      if (p.id != null) p.id!: p,
+  };
+
   Future<void> cargarProductos() async {
     _productos = await DBHelper.obtenerProductos();
     notifyListeners();
@@ -21,5 +27,4 @@ class ProductoProvider with ChangeNotifier {
     await DBHelper.actualizarProducto(producto);
     await cargarProductos(); // para recargar la lista en pantalla
   }
-//  agregar editarProducto, eliminarProducto, etc.
 }

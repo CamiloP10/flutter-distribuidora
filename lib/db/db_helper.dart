@@ -8,6 +8,8 @@ import '../models/cliente.dart';
 import '../models/factura.dart';
 import '../models/detalle_factura.dart';
 import '../models/cargue.dart';
+import '../models/abono.dart';
+
 
 class DBHelper {
   static Database? _db;
@@ -15,7 +17,14 @@ class DBHelper {
   static Future<Database> initDb() async {
     if (_db != null) return _db!;
     String path = join(await getDatabasesPath(), 'inventario.db');
-    _db = await openDatabase(path, version: 1, onCreate: _onCreate);
+    //_db = await openDatabase(path, version: 1, onCreate: _onCreate); crea la Db desde 0
+    _db = await openDatabase(
+      path,
+      version: 2, //Aumenta la versión cuando se añada otra tabla a la db
+      onCreate: _onCreate,
+      onUpgrade: _onUpgrade, //actualiza para no borrar datos de las tablas anteriores
+    );
+
     return _db!;
   }
 
@@ -83,6 +92,21 @@ class DBHelper {
   )
     ''');
   }
+
+  static Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('''
+      CREATE TABLE abono (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        facturaId INTEGER,
+        monto REAL,
+        fecha TEXT,
+        FOREIGN KEY (facturaId) REFERENCES factura(id)
+      )
+    ''');
+    }
+  }
+
 
   // PRODUCTOS
   static Future<int> insertarProducto(Producto producto) async {
@@ -286,4 +310,42 @@ class DBHelper {
     }
   }
 
+  //ABONOS
+  // Insertar un nuevo abono
+  static Future<void> insertarAbono(Abono abono) async {
+    final db = await initDb();
+    await db.insert('abono', abono.toMap());
+  }
+  // Obtener abonos por fecha
+  static Future<List<Abono>> obtenerAbonosPorFecha(DateTime fecha) async {
+    final db = await initDb();
+    final fechaStr = fecha.toIso8601String().substring(0, 10); // yyyy-MM-dd
+    final maps = await db.query(
+      'abono',
+      where: "DATE(fecha) = ?",
+      whereArgs: [fechaStr],
+    );
+    return maps.map((e) => Abono.fromMap(e)).toList();
+  }
+  // obtener todos los abonos
+  static Future<List<Abono>> obtenerTodosLosAbonos() async {
+    final db = await initDb();
+    final maps = await db.query('abono');
+    return maps.map((e) => Abono.fromMap(e)).toList();
+  }
+
+  //para los cierres
+  static Future<Factura> obtenerFacturaPorId(int id) async {
+    final db = await initDb();
+    final maps = await db.query('factura', where: 'id = ?', whereArgs: [id]);
+    if (maps.isEmpty) throw Exception('Factura no encontrada');
+    return Factura.fromMap(maps.first);
+  }
+
+  static Future<Cliente> obtenerClientePorId(int id) async {
+    final db = await initDb();
+    final maps = await db.query('cliente', where: 'id = ?', whereArgs: [id]);
+    if (maps.isEmpty) throw Exception('Cliente no encontrado');
+    return Cliente.fromMap(maps.first);
+  }
 }

@@ -7,10 +7,8 @@ import 'screens/home_screen.dart';
 import 'screens/agregar_producto_screen.dart';
 import 'screens/agregar_cliente_screen.dart';
 import 'providers/ventas_provider.dart';
-import 'providers/cargue_provider.dart';
-import 'providers/factura_provider.dart';
 import 'screens/creditos_screen.dart';
-
+import 'providers/cierre_dia_provider.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,8 +26,7 @@ class AppWithProviders extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ProductoProvider()),
         ChangeNotifierProvider(create: (_) => ClienteProvider()),
         ChangeNotifierProvider(create: (_) => VentasProvider()),
-        ChangeNotifierProvider(create: (_) => FacturaProvider()),
-        ChangeNotifierProvider(create: (_) => CargueProvider()),
+        ChangeNotifierProvider(create: (_) => CierreDiaProvider()),
       ],
       child: const MyApp(),
     );
@@ -62,7 +59,6 @@ class AppInitializer extends StatelessWidget {
   Widget build(BuildContext context) {
     final initProvider = Provider.of<InitProvider>(context);
 
-    // Ejecuta una sola vez cuando el frame esté listo
     WidgetsBinding.instance.addPostFrameCallback((_) {
       initProvider.inicializarTodo();
     });
@@ -73,12 +69,18 @@ class AppInitializer extends StatelessWidget {
       );
     }
 
-    // Una vez inicializado, cargar datos en los providers
+    // 🔄 Cargar datos iniciales en los providers
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Providers individuales
       Provider.of<ProductoProvider>(context, listen: false).cargarProductos();
       Provider.of<ClienteProvider>(context, listen: false).cargarClientes();
-      Provider.of<VentasProvider>(context, listen: false).cargarDatos();
-      Provider.of<FacturaProvider>(context, listen: false).cargarFacturas();
+
+      // VentasProvider -> necesita tenertodo cargado para que funcione bien en ventas y cargues
+      final ventasProvider = Provider.of<VentasProvider>(context, listen: false);
+      ventasProvider.cargarFacturas();
+      ventasProvider.cargarCargues();
+      ventasProvider.cargarClientes();   //asegura clientes en memoria
+      ventasProvider.cargarProductos();  // asegura productos en memoria
     });
 
     return const HomeScreen();
