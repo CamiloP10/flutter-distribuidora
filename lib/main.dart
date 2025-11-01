@@ -71,10 +71,16 @@ class AppInitializer extends StatelessWidget {
 
     // 🔄 Cargar datos iniciales en los providers
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Providers individuales
       Provider.of<ProductoProvider>(context, listen: false).cargarProductos();
       Provider.of<ClienteProvider>(context, listen: false).cargarClientes();
-      Provider.of<VentasProvider>(context, listen: false).cargarFacturas();
-      Provider.of<VentasProvider>(context, listen: false).cargarCargues();
+
+      // VentasProvider -> necesita tenertodo cargado para que funcione bien en ventas y cargues
+      final ventasProvider = Provider.of<VentasProvider>(context, listen: false);
+      ventasProvider.cargarFacturas();
+      ventasProvider.cargarCargues();
+      ventasProvider.cargarClientes();   //asegura clientes en memoria
+      ventasProvider.cargarProductos();  // asegura productos en memoria
     });
 
     return const HomeScreen();

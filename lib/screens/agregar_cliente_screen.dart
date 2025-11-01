@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/cliente.dart';
 import '../providers/cliente_provider.dart';
+import '../providers/ventas_provider.dart';
 
 class AgregarClienteScreen extends StatefulWidget {
   const AgregarClienteScreen({super.key});
@@ -15,7 +16,7 @@ class _AgregarClienteScreenState extends State<AgregarClienteScreen> {
   final TextEditingController telefonoController = TextEditingController();
   final TextEditingController informacionController = TextEditingController();
 
-  void guardarCliente() async {
+  Future<void> guardarCliente() async {
     final cliente = Cliente(
       id: 0, // será ignorado si es autoincremental en la base de datos
       nombre: nombreController.text,
@@ -23,7 +24,14 @@ class _AgregarClienteScreenState extends State<AgregarClienteScreen> {
       informacion: informacionController.text,
     );
 
-    await context.read<ClienteProvider>().agregarCliente(cliente);
+    final clienteProvider = context.read<ClienteProvider>();
+    final ventasProvider = context.read<VentasProvider>();
+
+    await clienteProvider.agregarCliente(cliente);
+
+    // Sincronizar también en VentasProvider
+    await ventasProvider.cargarClientes();
+
     Navigator.pop(context, true); // Regresa con éxito
   }
 

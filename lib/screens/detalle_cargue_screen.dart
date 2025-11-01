@@ -5,8 +5,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../providers/ventas_provider.dart';
-
-
 import '../models/cargue.dart';
 import '../models/detalle_factura.dart';
 import '../models/factura.dart';
@@ -36,19 +34,23 @@ class _DetalleCargueScreenState extends State<DetalleCargueScreen> {
   Future<void> cargarDatos() async {
     final ventasProvider = Provider.of<VentasProvider>(context, listen: false);
 
-    // 📌 cargar facturas de este cargue
+    // Forzar recarga de datos desde la base de datos
+    await ventasProvider.cargarFacturas();
+    await ventasProvider.cargarProductos();
+    await ventasProvider.cargarClientes();
+
+    // Filtrar facturas que pertenecen a este cargue
     facturas = ventasProvider.facturas
         .where((f) => widget.cargue.facturaIds.contains(f.id))
         .toList();
 
-    // 📌 cargar detalles de cada factura (forzando fetch desde DB)
+    // Cargar detalles de cada factura
     List<DetalleFactura> nuevosDetalles = [];
     for (var id in widget.cargue.facturaIds) {
       final d = await ventasProvider.cargarDetallesFactura(id);
       nuevosDetalles.addAll(d);
     }
     detalles = nuevosDetalles;
-
     setState(() {});
   }
 
@@ -59,7 +61,6 @@ class _DetalleCargueScreenState extends State<DetalleCargueScreen> {
     final productos = ventasProvider.productos;
     final clientes = clienteProvider.clientesMap;
     final format = DateFormat('dd/MM/yyyy HH:mm');
-
     final totalCargue =
     facturas.fold<double>(0, (sum, f) => sum + f.total);
     final totalEfectivo =
@@ -85,7 +86,6 @@ class _DetalleCargueScreenState extends State<DetalleCargueScreen> {
             Text('Total crédito: \$${totalCredito.toStringAsFixed(0)}'),
 
             const Divider(),
-
             Center(
               child: ElevatedButton.icon(
                 icon: const Icon(Icons.picture_as_pdf),
@@ -103,7 +103,6 @@ class _DetalleCargueScreenState extends State<DetalleCargueScreen> {
                   final file =
                   File('${dir.path}/cargue_${widget.cargue.id}.pdf');
                   await file.writeAsBytes(pdf);
-
                   await Share.shareXFiles(
                     [XFile(file.path)],
                     text: 'Cargue #${widget.cargue.id}',
@@ -111,7 +110,6 @@ class _DetalleCargueScreenState extends State<DetalleCargueScreen> {
                 },
               ),
             ),
-
             const SizedBox(height: 10),
 
             ElevatedButton.icon(
@@ -251,14 +249,16 @@ Future<void> mostrarDialogoSeleccionFacturas(
                         facturaIds: nuevasFacturas.toSet().toList());
 
                     await ventasProvider.actualizarCargue(nuevoCargue);
+                    // Recargar datos antes de volver a mostrar el cargue
+                    await ventasProvider.cargarFacturas();
+                    await ventasProvider.cargarProductos();
+                    await ventasProvider.cargarClientes();
 
                     Navigator.pop(context);
-
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
-                        builder: (_) =>
-                            DetalleCargueScreen(cargue: nuevoCargue),
+                        builder: (_) => DetalleCargueScreen(cargue: nuevoCargue),
                       ),
                     );
 

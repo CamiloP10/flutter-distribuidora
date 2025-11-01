@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import '../models/producto.dart';
 import '../providers/producto_provider.dart';
+import '../providers/ventas_provider.dart';
 import 'agregar_producto_screen.dart';
-import 'package:intl/intl.dart';
 
 final NumberFormat currencyFormat = NumberFormat('#,##0', 'es_CO');
 
@@ -51,7 +52,6 @@ class _InventarioScreenState extends State<InventarioScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Inventario de Productos')),
-
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -75,7 +75,9 @@ class _InventarioScreenState extends State<InventarioScreen> {
                 itemBuilder: (context, index) {
                   final p = mostrar[index];
                   return ListTile(
-                    title: Text('${p.presentacion} - \$${currencyFormat.format(p.precio.toInt())}'),
+                    title: Text(
+                      '${p.presentacion} - \$${currencyFormat.format(p.precio.toInt())}',
+                    ),
                     subtitle: Text('${p.nombre} - Cod: ${p.codigo}'),
                     trailing: IconButton(
                       icon: const Icon(Icons.edit, color: Colors.blue),
@@ -88,9 +90,16 @@ class _InventarioScreenState extends State<InventarioScreen> {
                         );
 
                         if (result == true) {
-                          productoProvider.cargarProductos();
+                          await productoProvider.cargarProductos();
+                          await Provider.of<VentasProvider>(
+                            context,
+                            listen: false,
+                          ).cargarProductos(); // sincroniza ventas
                           if (busquedaController.text.isNotEmpty) {
-                            filtrarProductos(busquedaController.text, productoProvider.productos);
+                            filtrarProductos(
+                              busquedaController.text,
+                              productoProvider.productos,
+                            );
                           }
                         }
                       },
@@ -102,14 +111,20 @@ class _InventarioScreenState extends State<InventarioScreen> {
           ],
         ),
       ),
-
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           final result = await Navigator.pushNamed(context, '/agregarProducto');
           if (result == true) {
-            productoProvider.cargarProductos();
+            await productoProvider.cargarProductos();
+            await Provider.of<VentasProvider>(
+              context,
+              listen: false,
+            ).cargarProductos(); // sincroniza ventas
             if (busquedaController.text.isNotEmpty) {
-              filtrarProductos(busquedaController.text, productoProvider.productos);
+              filtrarProductos(
+                busquedaController.text,
+                productoProvider.productos,
+              );
             }
           }
         },
