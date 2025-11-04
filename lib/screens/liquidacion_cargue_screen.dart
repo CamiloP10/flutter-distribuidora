@@ -1,10 +1,35 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/cargue.dart';
 import '../models/factura.dart';
 import '../providers/ventas_provider.dart';
+import '../utils/pdf_generator.dart';
 
+// (Clase ThousandsInputFormatter sin cambios)
+class ThousandsInputFormatter extends TextInputFormatter {
+  final NumberFormat _formatter = NumberFormat('#,##0', 'es_CO');
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.isEmpty) {
+      return newValue.copyWith(text: '');
+    }
+    final unformatted = newValue.text.replaceAll('.', '');
+    final number = int.tryParse(unformatted) ?? 0;
+    final formatted = _formatter.format(number);
+    return newValue.copyWith(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
+// --- PANTALLA PRINCIPAL ---
 class LiquidacionCargueScreen extends StatefulWidget {
   const LiquidacionCargueScreen({super.key});
 
@@ -37,7 +62,7 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
     }
   }
 
-  Map<String, double> _calcularTotalesVenta(
+  double _calcularTotalVendido(
       List<Cargue> todosLosCargues, List<Factura> todasLasFacturas) {
     double totalVendido = 0;
 
@@ -47,7 +72,7 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
 
     final Set<int> facturasIds = {};
     for (final cargue in carguesFiltrados) {
-      facturasIds.addAll(cargue.facturaIds);
+      facturasIds.addAll(cargue.facturaIds); // Corregido
     }
 
     for (final factura in todasLasFacturas) {
@@ -55,12 +80,18 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
         totalVendido += factura.total;
       }
     }
-    return {'total': totalVendido};
+    return totalVendido;
   }
 
-  // --- 1. FUNCIÓN PARA MOSTRAR EL DIÁLOGO FLOTANTE ---
-  void _mostrarDialogoLiquidacion(BuildContext context, double totalVendido) {
-    // Controladores para cada campo de texto
+  // --- FUNCIÓN DE MODAL (ACTUALIZADA) ---
+  void _mostrarDialogoLiquidacion(
+      BuildContext context,
+      double totalVendido,
+      List<Cargue> carguesLiquidados,
+      List<Factura> todasLasFacturas,
+      ) {
+
+    // Controladores
     final c100k = TextEditingController();
     final c50k = TextEditingController();
     final c20k = TextEditingController();
@@ -68,39 +99,73 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
     final c5k = TextEditingController();
     final c2k = TextEditingController();
     final cMonedas = TextEditingController();
+    final cNequi = TextEditingController();
+    final cDevoluciones = TextEditingController();
+    final cCreditos = TextEditingController();
 
-    double t100k = 0, t50k = 0, t20k = 0, t10k = 0, t5k = 0, t2k = 0, tMonedas = 0;
-    double totalRecibido = 0;
+    // Mapas de datos
+    final Map<String, int> cantidades = {};
+    final Map<String, double> subtotales = {};
+    double tMonedas = 0;
+    double tNequi = 0;
+    double tDevoluciones = 0;
+    double tCreditos = 0;
+    double totalRecibido = 0; // Total de EFECTIVO (Billetes + Monedas)
+    double efectivoEsperado = 0;
+    double diferencia = 0;
+
+    bool _isConfirming = false;
+
+    // Función para quitar formato antes de parsear
+    double _parseFormatted(String text) {
+      final unformatted = text.replaceAll('.', '');
+      return double.tryParse(unformatted) ?? 0;
+    }
 
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true, // Permite que el modal sea de pantalla completa si es necesario
+      isScrollControlled: true,
       builder: (ctx) {
-        // StatefulBuilder para que el modal tenga su PROPIO estado y se pueda actualizar en tiempo real
         return StatefulBuilder(
           builder: (modalContext, setModalState) {
 
-            // Función para recalcula
+            // --- LÓGICA DE 'RECALCULAR' ACTUALIZADA ---
             void recalcular() {
-              t100k = (int.tryParse(c100k.text) ?? 0) * 100000;
-              t50k = (int.tryParse(c50k.text) ?? 0) * 50000;
-              t20k = (int.tryParse(c20k.text) ?? 0) * 20000;
-              t10k = (int.tryParse(c10k.text) ?? 0) * 10000;
-              t5k = (int.tryParse(c5k.text) ?? 0) * 5000;
-              t2k = (int.tryParse(c2k.text) ?? 0) * 2000;
-              tMonedas = (double.tryParse(cMonedas.text) ?? 0);
+              cantidades['100k'] = int.tryParse(c100k.text.replaceAll('.', '')) ?? 0;
+              cantidades['50k'] = int.tryParse(c50k.text.replaceAll('.', '')) ?? 0;
+              cantidades['20k'] = int.tryParse(c20k.text.replaceAll('.', '')) ?? 0;
+              cantidades['10k'] = int.tryParse(c10k.text.replaceAll('.', '')) ?? 0;
+              cantidades['5k'] = int.tryParse(c5k.text.replaceAll('.', '')) ?? 0;
+              cantidades['2k'] = int.tryParse(c2k.text.replaceAll('.', '')) ?? 0;
 
-              totalRecibido = t100k + t50k + t20k + t10k + t5k + t2k + tMonedas;
+              subtotales['100k'] = cantidades['100k']! * 100000.0;
+              subtotales['50k'] = cantidades['50k']! * 50000.0;
+              subtotales['20k'] = cantidades['20k']! * 20000.0;
+              subtotales['10k'] = cantidades['10k']! * 10000.0;
+              subtotales['5k'] = cantidades['5k']! * 5000.0;
+              subtotales['2k'] = cantidades['2k']! * 2000.0;
 
-              // Actualiza solo el estado del modal
+              tMonedas = _parseFormatted(cMonedas.text);
+              tNequi = _parseFormatted(cNequi.text);
+              tDevoluciones = _parseFormatted(cDevoluciones.text);
+              tCreditos = _parseFormatted(cCreditos.text);
+
+              // 1. El efectivo esperado es la venta MENOS todo lo que no es efectivo físico
+              efectivoEsperado = totalVendido - tDevoluciones - tCreditos - tNequi;
+
+              // 2. El total recibido es SOLO el efectivo físico (Billetes + Monedas)
+              totalRecibido = subtotales.values.fold(0.0, (a, b) => a + b) + tMonedas;
+
+              // 3. La diferencia es el efectivo físico recibido vs el esperado
+              diferencia = totalRecibido - efectivoEsperado;
+
               setModalState(() {});
             }
 
-            // El padding que se ajusta al teclado
             return Padding(
               padding: EdgeInsets.only(
                   bottom: MediaQuery.of(modalContext).viewInsets.bottom),
-              child: SingleChildScrollView( // Para poder deslizar si el teclado es grande
+              child: SingleChildScrollView(
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -111,85 +176,123 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
                       style: Theme.of(context).textTheme.headlineSmall,
                     ),
                     const SizedBox(height: 16),
-                    // --- Total Vendido ---
-                    Text(
-                      'Total Vendido (Facturas):',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    Text(
-                      currencyFormat.format(totalVendido),
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          color: Colors.blue, fontWeight: FontWeight.bold),
-                    ),
+
+                    // --- SECCIÓN DE TOTALES (ACTUALIZADA) ---
+                    _buildTotalRow(
+                        'Total Vendido (Facturas):',
+                        currencyFormat.format(totalVendido),
+                        Colors.black),
+
+                    _buildInputRow('Devoluciones:', cDevoluciones, recalcular,
+                        prefix: '- \$ ', color: Colors.red),
+
+                    _buildInputRow('Créditos:', cCreditos, recalcular,
+                        prefix: '- \$ ', color: Colors.orange),
+
+                    // --- CAMBIO: NEQUI AHORA ES UN DESCUENTO ---
+                    _buildInputRow('Nequi:', cNequi, recalcular,
+                        prefix: '- \$ ', color: Colors.purple, icon: Icons.phone_android),
+
+                    const Divider(),
+                    _buildTotalRow(
+                        'Efectivo Esperado:',
+                        currencyFormat.format(efectivoEsperado),
+                        Colors.blue,
+                        isLarge: true),
                     const Divider(height: 24),
 
-                    // --- Dinero Recibido ---
+                    // --- SECCIÓN DINERO RECIBIDO (EFECTIVO) ---
                     Text(
-                      'Dinero Recibido:',
+                      'Dinero Recibido (Efectivo Físico):',
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 8),
+                    _buildDenominacionRow('\$100.000', c100k,
+                        subtotales['100k'] ?? 0, recalcular),
+                    _buildDenominacionRow('\$50.000', c50k,
+                        subtotales['50k'] ?? 0, recalcular),
+                    _buildDenominacionRow('\$20.000', c20k,
+                        subtotales['20k'] ?? 0, recalcular),
+                    _buildDenominacionRow('\$10.000', c10k,
+                        subtotales['10k'] ?? 0, recalcular),
                     _buildDenominacionRow(
-                        '\$100.000', c100k, t100k, recalcular),
+                        '\$5.000', c5k, subtotales['5k'] ?? 0, recalcular),
                     _buildDenominacionRow(
-                        '\$50.000', c50k, t50k, recalcular),
-                    _buildDenominacionRow(
-                        '\$20.000', c20k, t20k, recalcular),
-                    _buildDenominacionRow(
-                        '\$10.000', c10k, t10k, recalcular),
-                    _buildDenominacionRow(
-                        '\$5.000', c5k, t5k, recalcular),
-                    _buildDenominacionRow(
-                        '\$2.000', c2k, t2k, recalcular),
+                        '\$2.000', c2k, subtotales['2k'] ?? 0, recalcular),
 
-                    // --- Campo de Monedas ---
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        children: [
-                          const Text('Monedas:',
-                              style: TextStyle(fontSize: 16)),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: TextField(
-                              controller: cMonedas,
-                              onChanged: (_) => recalcular(),
-                              keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(
-                                hintText: 'Valor total',
-                                prefixText: '\$ ',
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    _buildInputRow('Monedas:', cMonedas, recalcular,
+                        prefix: '\$ '),
+
+                    // (El campo Nequi se movió arriba)
+
                     const Divider(height: 24),
 
-                    // --- Total Recibido (Calculado) ---
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Total Recibido:',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        Text(
-                          currencyFormat.format(totalRecibido),
-                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                              color: Colors.green, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
+                    // --- Totales Recibidos ---
+                    _buildTotalRow(
+                        'Efectivo Recibido:',
+                        currencyFormat.format(totalRecibido),
+                        Colors.green,
+                        isLarge: true),
+
+                    _buildTotalRow(
+                        'Diferencia:',
+                        currencyFormat.format(diferencia),
+                        diferencia == 0 ? Colors.black : Colors.orange,
+                        isLarge: true),
+
                     const SizedBox(height: 20),
+
+                    // --- BOTÓN DE CONFIRMAR (Sin cambios en la lógica, solo pasa los datos) ---
                     ElevatedButton(
-                      onPressed: () {
-                        // Aquí iría la lógica para guardar la liquidación
-                        Navigator.pop(context); // Cierra el modal
+                      onPressed: _isConfirming ? null : () async {
+                        setModalState(() => _isConfirming = true);
+
+                        try {
+                          // Generar PDF
+                          final pdfBytes = await PdfGenerator.generarLiquidacionPDF(
+                            totalVendido: totalVendido,
+                            totalDevoluciones: tDevoluciones,
+                            totalCreditos: tCreditos,
+                            totalNequi: tNequi,
+                            totalRecibido: totalRecibido, // Este es solo el efectivo
+                            cantidades: cantidades,
+                            subtotales: subtotales,
+                            monedas: tMonedas,
+                            carguesLiquidados: carguesLiquidados,
+                            todasLasFacturas: todasLasFacturas,
+                          );
+
+                          // Guardar y Compartir PDF
+                          final dir = await getTemporaryDirectory();
+                          final file = File('${dir.path}/liquidacion_${DateTime.now().millisecondsSinceEpoch}.pdf');
+                          await file.writeAsBytes(pdfBytes);
+
+                          await Share.shareXFiles(
+                            [XFile(file.path)],
+                            text: 'Liquidación de Caja - ${DateFormat('yyyy-MM-dd').format(DateTime.now())}',
+                          );
+
+                          if (modalContext.mounted) {
+                            Navigator.pop(modalContext);
+                          }
+
+                        } catch (e) {
+                          if (modalContext.mounted) {
+                            ScaffoldMessenger.of(modalContext).showSnackBar(
+                              SnackBar(content: Text('Error al generar PDF: $e')),
+                            );
+                          }
+                        } finally {
+                          if(mounted) {
+                            setModalState(() => _isConfirming = false);
+                          }
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                           minimumSize: const Size(double.infinity, 50)),
-                      child: const Text('Confirmar Liquidación'),
+                      child: _isConfirming
+                          ? const CircularProgressIndicator()
+                          : const Text('Confirmar Liquidación y Generar PDF'),
                     )
                   ],
                 ),
@@ -201,34 +304,33 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
     );
   }
 
-  // --- 2. WIDGET HELPER PARA LAS FILAS DE DENOMINACIONES ---
+  // (Widget helper denominación - sin cambios)
   Widget _buildDenominacionRow(String label, TextEditingController controller,
       double subtotal, VoidCallback onRecalcular) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
-          // Etiqueta (ej. "$100.000")
           SizedBox(
               width: 70, child: Text(label, style: const TextStyle(fontSize: 16))),
           const Text('x', style: TextStyle(color: Colors.grey)),
           const SizedBox(width: 8),
-
-          // Campo de cantidad
           SizedBox(
             width: 70,
             child: TextField(
               controller: controller,
               onChanged: (_) => onRecalcular(),
               keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                ThousandsInputFormatter(),
+              ],
               decoration: const InputDecoration(hintText: 'Cant.'),
             ),
           ),
           const SizedBox(width: 8),
           const Text('=', style: TextStyle(fontSize: 16)),
           const SizedBox(width: 8),
-
-          // Subtotal calculado
           Expanded(
             child: Text(
               currencyFormat.format(subtotal),
@@ -241,8 +343,42 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
     );
   }
 
+  // (Widget helper input - sin cambios)
+  Widget _buildInputRow(String label, TextEditingController controller,
+      VoidCallback onRecalcular, {IconData? icon, String prefix = '', Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          if (icon != null) ...[Icon(icon, size: 18, color: color ?? Colors.grey), const SizedBox(width: 4)],
+          Text(label, style: TextStyle(fontSize: 16, color: color)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              onChanged: (_) => onRecalcular(),
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                ThousandsInputFormatter(),
+              ],
+              textAlign: TextAlign.right,
+              style: TextStyle(color: color),
+              decoration: InputDecoration(
+                  hintText: 'Valor total',
+                  prefixText: prefix,
+                  prefixStyle: TextStyle(color: color)
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext c) {
+    // (build... sin cambios)
     final ventasProvider = context.watch<VentasProvider>();
     final List<Cargue> todosLosCargues = [...ventasProvider.cargues];
     todosLosCargues.sort((a, b) => b.fecha.compareTo(a.fecha));
@@ -255,8 +391,7 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
         .where((c) => !_carguesSeleccionados.contains(c.id))
         .toList();
 
-    // Calcula el total de la venta (no el recibido)
-    final totalesVenta = _calcularTotalesVenta(carguesEnLista, todasLasFacturas);
+    final totalVendido = _calcularTotalVendido(carguesEnLista, todasLasFacturas);
 
     return Scaffold(
       appBar: AppBar(
@@ -266,7 +401,7 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
         children: [
-          // --- SELECCIÓN DE CARGUE (Dropdown) ---
+          // (Dropdown... sin cambios)
           Padding(
             padding: const EdgeInsets.all(12.0),
             child: DropdownButtonFormField<int>(
@@ -296,7 +431,7 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
             ),
           ),
 
-          // --- LISTA DE CARGUES SELECCIONADOS ---
+          // (Lista de cargues... sin cambios)
           const Divider(),
           const Text(
             'Cargues a liquidar:',
@@ -339,8 +474,7 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
           ),
         ],
       ),
-      // --- 3. BOTÓN INFERIOR PARA LIQUIDAR (NUEVO) ---
-
+      // (Botón inferior... sin cambios)
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.all(12.0),
         child: ElevatedButton.icon(
@@ -349,14 +483,41 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
           style: ElevatedButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 16),
           ),
-          // El botón se deshabilita si no hay cargues seleccionados
           onPressed: _carguesSeleccionados.isEmpty
               ? null
               : () {
-            // Pasa el total de la VENTA (no del efectivo) al modal
-            _mostrarDialogoLiquidacion(context, totalesVenta['total']!);
+            _mostrarDialogoLiquidacion(
+              context,
+              totalVendido,
+              carguesEnLista,
+              todasLasFacturas,
+            );
           },
         ),
+      ),
+    );
+  }
+
+  // (Widget helper para filas de totales - sin cambios)
+  Widget _buildTotalRow(String label, String value, Color color, {bool isLarge = false}) {
+    final textStyle = isLarge
+        ? Theme.of(context).textTheme.titleLarge
+        : Theme.of(context).textTheme.titleMedium;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: textStyle),
+          Text(
+            value,
+            style: textStyle?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ],
       ),
     );
   }

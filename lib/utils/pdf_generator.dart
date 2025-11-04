@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:pdf/pdf.dart';
 import 'package:intl/intl.dart';
-
 import '../models/factura.dart';
 import '../models/detalle_factura.dart';
 import '../models/producto.dart';
@@ -310,4 +309,199 @@ class PdfGenerator {
     return numero % 1 == 0 ? numero.toInt().toString() : numero.toString();
   }
 
+  // para las liquidaciones de cargues
+  static Future<Uint8List> generarLiquidacionPDF({
+    required double totalVendido,
+    required double totalDevoluciones,
+    required double totalCreditos,
+    required double totalNequi,
+    required double totalRecibido, // Esto ahora es solo el efectivo
+    required Map<String, int> cantidades,
+    required Map<String, double> subtotales,
+    required double monedas,
+    required List<Cargue> carguesLiquidados,
+    required List<Factura> todasLasFacturas,
+  }) async {
+    final pdf = pw.Document();
+    final formatMiles = NumberFormat('#,###', 'es_CO');
+    final formatFecha = DateFormat('yyyy-MM-dd HH:mm');
+
+    final Map<String, String> etiquetas = {
+      '100k': '\$100.000',
+      '50k': '\$50.000',
+      '20k': '\$20.000',
+      '10k': '\$10.000',
+      '5k': '\$5.000',
+      '2k': '\$2.000',
+    };
+
+    // --- LÓGICA DE CÁLCULO ACTUALIZADA ---
+    final double efectivoEsperado = totalVendido - totalDevoluciones - totalCreditos - totalNequi;
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat:
+        PdfPageFormat(58 * PdfPageFormat.mm, PdfPageFormat.a4.height),
+        margin: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+        build: (context) => [
+          pw.Center(
+            child: pw.Text(
+              'LIQUIDACIÓN DE CAJA',
+              style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+            ),
+          ),
+          pw.SizedBox(height: 6),
+          pw.Text('Fecha: ${formatFecha.format(DateTime.now())}',
+              style: const pw.TextStyle(fontSize: 9)),
+          pw.Divider(),
+
+          // --- Totales Generales (ACTUALIZADO) ---
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text('Total Vendido:',
+                  style: const pw.TextStyle(fontSize: 9)),
+              pw.Text('\$${formatMiles.format(totalVendido)}',
+                  style: const pw.TextStyle(fontSize: 9)),
+            ],
+          ),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text('Devoluciones:',
+                  style: const pw.TextStyle(fontSize: 9)),
+              pw.Text('- \$${formatMiles.format(totalDevoluciones)}',
+                  style: const pw.TextStyle(fontSize: 9)),
+            ],
+          ),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text('Créditos:',
+                  style: const pw.TextStyle(fontSize: 9)),
+              pw.Text('- \$${formatMiles.format(totalCreditos)}',
+                  style: const pw.TextStyle(fontSize: 9)),
+            ],
+          ),
+          // --- NUEVA LÍNEA NEQUI (MOVIDA AQUÍ) ---
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text('Nequi:',
+                  style: const pw.TextStyle(fontSize: 9)),
+              pw.Text('- \$${formatMiles.format(totalNequi)}',
+                  style: const pw.TextStyle(fontSize: 9)),
+            ],
+          ),
+          pw.Divider(thickness: 0.5),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text('Efectivo Esperado:',
+                  style: pw.TextStyle(
+                      fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              pw.Text('\$${formatMiles.format(efectivoEsperado)}',
+                  style: pw.TextStyle(
+                      fontSize: 10, fontWeight: pw.FontWeight.bold)),
+            ],
+          ),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text('Efectivo Recibido:', // <-- Texto actualizado
+                  style: pw.TextStyle(
+                      fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              pw.Text('\$${formatMiles.format(totalRecibido)}',
+                  style: pw.TextStyle(
+                      fontSize: 10, fontWeight: pw.FontWeight.bold)),
+            ],
+          ),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text('Diferencia:',
+                  style: pw.TextStyle(
+                      fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              pw.Text('\$${formatMiles.format(totalRecibido - efectivoEsperado)}',
+                  style: pw.TextStyle(
+                      fontSize: 10, fontWeight: pw.FontWeight.bold)),
+            ],
+          ),
+          pw.Divider(),
+
+          // --- Arqueo de Caja (ACTUALIZADO) ---
+          pw.Text('ARQUEO DE CAJA (EFECTIVO)', // <-- Texto actualizado
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
+          ...etiquetas.keys.map((key) {
+            final cantidad = cantidades[key] ?? 0;
+            final subtotal = subtotales[key] ?? 0;
+            if (cantidad == 0) return pw.Container();
+
+            return pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('${etiquetas[key]} x ${cantidad}',
+                    style: const pw.TextStyle(fontSize: 8)),
+                pw.Text('\$${formatMiles.format(subtotal)}',
+                    style: const pw.TextStyle(fontSize: 8)),
+              ],
+            );
+          }).toList(),
+          if (monedas > 0)
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('Monedas:', style: const pw.TextStyle(fontSize: 8)),
+                pw.Text('\$${formatMiles.format(monedas)}',
+                    style: const pw.TextStyle(fontSize: 8)),
+              ],
+            ),
+          // (La línea de Nequi se quitó de aquí)
+          pw.Divider(),
+
+          // --- Cargues Liquidados (con total por cargue) ---
+          pw.Text('CARGUES LIQUIDADOS',
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
+          pw.SizedBox(height: 5),
+
+          ...carguesLiquidados.map((cargue) {
+            final double totalDelCargue = todasLasFacturas
+                .where((factura) => cargue.facturaIds.contains(factura.id))
+                .fold(0.0, (sum, factura) => sum + (factura.total ?? 0));
+
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Expanded(
+                      child: pw.Text(
+                        '#${cargue.id} - ${cargue.vehiculoAsignado} (${cargue.conductor})',
+                        style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+                      ),
+                    ),
+                    pw.SizedBox(width: 5),
+                    pw.Text(
+                      '\$${formatMiles.format(totalDelCargue)}',
+                      style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 3),
+                pw.Text(
+                  'Obs:',
+                  style: const pw.TextStyle(fontSize: 7),
+                ),
+                pw.Divider(thickness: 0.5, height: 12),
+                pw.SizedBox(height: 10),
+              ],
+            );
+          }).toList(),
+        ],
+      ),
+    );
+    return pdf.save();
+  }
 }
