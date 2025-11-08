@@ -498,7 +498,6 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
     );
   }
 
-  // (Widget helper para filas de totales - sin cambios)
   Widget _buildTotalRow(String label, String value, Color color, {bool isLarge = false}) {
     final textStyle = isLarge
         ? Theme.of(context).textTheme.titleLarge
