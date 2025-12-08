@@ -12,6 +12,7 @@ import '../models/producto.dart';
 import '../providers/ventas_provider.dart';
 import '../utils/pdf_generator.dart';
 
+// CLASE PRINCIPAL DEL WIDGET (LA QUE FALTABA)
 class DetalleVentaScreen extends StatefulWidget {
   final Factura factura;
   final Cliente? cliente;
@@ -28,14 +29,20 @@ class DetalleVentaScreen extends StatefulWidget {
   State<DetalleVentaScreen> createState() => _DetalleVentaScreenState();
 }
 
+// CLASE DEL ESTADO MODIFICADA
 class _DetalleVentaScreenState extends State<DetalleVentaScreen> {
   final currencyFormat = NumberFormat('#,##0', 'es_CO');
+
+  // --- 1. Declarar el Future como una variable de estado ---
+  late Future<List<DetalleFactura>> _detallesFuture;
 
   @override
   void initState() {
     super.initState();
     final ventasProvider = Provider.of<VentasProvider>(context, listen: false);
-    ventasProvider.cargarDetallesFactura(widget.factura.id!);
+
+    // --- 2. Asignar el future en lugar de solo llamarlo ---
+    _detallesFuture = ventasProvider.cargarDetallesFactura(widget.factura.id!);
   }
 
   Future<void> _actualizarFactura(Factura factura) async {
@@ -172,13 +179,14 @@ class _DetalleVentaScreenState extends State<DetalleVentaScreen> {
     final TextEditingController productoCtrl = TextEditingController();
     Producto? productoSeleccionado;
 
-    final productosDisponibles = widget.productosMap.values.toList();
+    // Usamos el mapa de productos del provider que ya está en memoria
+    final productosDisponibles = Provider.of<VentasProvider>(context, listen: false).productosMap.values.toList();
 
     showDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(
-          builder: (context, setState) {
+          builder: (context, setStateDialog) { // Renombrado para evitar confusión
             return AlertDialog(
               title: const Text('Agregar producto a la factura'),
               content: Column(
@@ -204,7 +212,7 @@ class _DetalleVentaScreenState extends State<DetalleVentaScreen> {
                         '${seleccionado.nombre} - ${seleccionado.presentacion}';
                         precioCtrl.text =
                             seleccionado.precio.toStringAsFixed(0);
-                        setState(() {});
+                        setStateDialog(() {}); // Actualiza el modal
                       }
                     },
                   ),
@@ -267,7 +275,11 @@ class _DetalleVentaScreenState extends State<DetalleVentaScreen> {
 
                     final ventasProvider =
                     Provider.of<VentasProvider>(context, listen: false);
-                    await ventasProvider.cargarDetallesFactura(factura.id!);
+
+                    // --- 3. Actualizamos el Future en el estado ---
+                    setState(() {
+                      _detallesFuture = ventasProvider.cargarDetallesFactura(factura.id!);
+                    });
 
                     if (mounted) Navigator.pop(context);
                   },
@@ -289,7 +301,7 @@ class _DetalleVentaScreenState extends State<DetalleVentaScreen> {
     final factura = ventasProvider.facturas
         .firstWhere((f) => f.id == widget.factura.id);
 
-    final detalles = ventasProvider.getDetallesFactura(factura.id!);
+    // Usamos el mapa de productos del provider
     final productosMap = ventasProvider.productosMap;
 
     return Scaffold(
@@ -320,6 +332,9 @@ class _DetalleVentaScreenState extends State<DetalleVentaScreen> {
                       icon: const Icon(Icons.picture_as_pdf),
                       label: const Text('Generar PDF'),
                       onPressed: () async {
+                        // Obtenemos los detalles del future actual
+                        final detalles = await _detallesFuture;
+
                         final clienteFinal = widget.cliente ??
                             Cliente(
                                 id: 0,
@@ -360,40 +375,69 @@ class _DetalleVentaScreenState extends State<DetalleVentaScreen> {
             const Text('Productos:',
                 style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 5),
+
+            // --- 4. Reemplazar el ListView.builder por un FutureBuilder ---
             Expanded(
-              child: ListView.builder(
-                itemCount: detalles.length,
-                itemBuilder: (context, index) {
-                  final d = detalles[index];
-                  final p = productosMap[d.productoId];
-                  return ListTile(
-                    title: Text('${p?.nombre ?? 'NR'} - ${p?.presentacion ?? ''}'),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Cantidad: ${formatearCantidad(d.cantidad)}'),
-                        if (d.precioOriginal != d.precioModificado)
-                          Text(
-                            'Precio original: \$${currencyFormat.format(d.precioOriginal)}',
-                            style: const TextStyle(
-                              decoration: TextDecoration.lineThrough,
-                              color: Colors.grey,
+              child: FutureBuilder<List<DetalleFactura>>(
+                future: _detallesFuture, // Usamos el Future de nuestro estado
+                builder: (context, snapshot) {
+                  // Estado de Carga
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  // Estado de Error
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text('Error al cargar detalles: ${snapshot.error}'),
+                    );
+                  }
+
+                  // Estado de Éxito (pero vacío)
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const Center(
+                      child: Text('No hay productos en esta factura.'),
+                    );
+                  }
+
+                  // Estado de Éxito (con datos)
+                  final detalles = snapshot.data!;
+
+                  return ListView.builder(
+                    itemCount: detalles.length,
+                    itemBuilder: (context, index) {
+                      final d = detalles[index];
+                      final p = productosMap[d.productoId];
+                      return ListTile(
+                        title: Text('${p?.nombre ?? 'NR'} - ${p?.presentacion ?? ''}'),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Cantidad: ${formatearCantidad(d.cantidad)}'),
+                            if (d.precioOriginal != d.precioModificado)
+                              Text(
+                                'Precio original: \$${currencyFormat.format(d.precioOriginal)}',
+                                style: const TextStyle(
+                                  decoration: TextDecoration.lineThrough,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            Text(
+                              'Precio final U: \$${currencyFormat.format(d.precioModificado)}',
+                              style: const TextStyle(fontWeight: FontWeight.bold),
                             ),
-                          ),
-                        Text(
-                          'Precio final U: \$${currencyFormat.format(d.precioModificado)}',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          ],
                         ),
-                      ],
-                    ),
-                    trailing: Text(
-                      ' Tot: \$${currencyFormat.format(d.subtotal)}',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
+                        trailing: Text(
+                          ' Tot: \$${currencyFormat.format(d.subtotal)}',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      );
+                    },
                   );
                 },
               ),
@@ -419,6 +463,7 @@ class _DetalleVentaScreenState extends State<DetalleVentaScreen> {
   }
 }
 
+// --- CLASE DE BÚSQUEDA (LA QUE ESTABA AL FINAL) ---
 class ProductoSearchDelegate extends SearchDelegate<Producto> {
   final List<Producto> productos;
 
