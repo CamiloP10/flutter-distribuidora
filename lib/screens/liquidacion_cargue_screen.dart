@@ -150,7 +150,7 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
               tDevoluciones = _parseFormatted(cDevoluciones.text);
               tCreditos = _parseFormatted(cCreditos.text);
 
-              // 1. El efectivo esperado es la venta MENOS todo lo que no es efectivo físico
+              // 1. El efectivo esperado es la venta MENOS efectivo físico
               efectivoEsperado = totalVendido - tDevoluciones - tCreditos - tNequi;
 
               // 2. El total recibido es SOLO el efectivo físico (Billetes + Monedas)

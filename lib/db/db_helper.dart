@@ -9,6 +9,10 @@ import '../models/factura.dart';
 import '../models/detalle_factura.dart';
 import '../models/cargue.dart';
 import '../models/abono.dart';
+import 'dart:io'; // Para manejar archivos (File)
+import 'package:share_plus/share_plus.dart'; // Para compartir el archivo (backup)
+import 'package:intl/intl.dart'; // Para la fecha de la db
+import 'package:path_provider/path_provider.dart'; // Para carpeta temporal
 
 
 class DBHelper {
@@ -24,7 +28,6 @@ class DBHelper {
       onCreate: _onCreate,
       onUpgrade: _onUpgrade, //actualiza para no borrar datos de las tablas anteriores
     );
-
     return _db!;
   }
 
@@ -348,4 +351,103 @@ class DBHelper {
     if (maps.isEmpty) throw Exception('Cliente no encontrado');
     return Cliente.fromMap(maps.first);
   }
+
+  //FUNCIÓN COPIA DE SEGURIDAD
+  static Future<void> exportarBaseDeDatos() async {
+    try {
+      // 1. Ubicar la base de datos original
+      final dbFolder = await getDatabasesPath();
+      final dbPath = join(dbFolder, 'inventario.db');
+      final file = File(dbPath);
+
+      if (await file.exists()) {
+        // 2. Generar el nombre con fecha y hora (Ej: inventario_2023-10-27_15-30.db)
+        final now = DateTime.now();
+        final formatter = DateFormat('yyyy-MM-dd_HH-mm');
+        final fechaHora = formatter.format(now);
+        final nuevoNombre = 'inventario_$fechaHora.db';
+
+        // 3. Obtener una carpeta temporal donde guardar la copia
+        final tempDir = await getTemporaryDirectory();
+        final tempPath = join(tempDir.path, nuevoNombre);
+
+        // 4. Copiar el archivo original a la carpeta temporal con el nuevo nombre
+        await file.copy(tempPath);
+
+        // 5. Compartir el archivo COPIADO (que ya tiene el nombre correcto)
+        await Share.shareXFiles(
+          [XFile(tempPath)],
+          text: 'Copia de seguridad generada el $fechaHora',
+        );
+      } else {
+        print("❌ No se encontró el archivo de base de datos original.");
+      }
+    } catch (e) {
+      print("❌ Error al exportar la base de datos: $e");
+    }
+  }
+
+  // FUNCIÓN DE LIMPIEZA
+  static Future<void> limpiarDatosAntiguos() async {
+    final db = await initDb();
+
+    // Calcula la fecha límite (hace 60 días)
+    final fechaLimite = DateTime.now().subtract(const Duration(days: 60)).toIso8601String();
+
+    try {
+      // 1. ELIMINAR FACTURAS ANTIGUAS Y PAGADAS
+      // Buscar facturas viejas ( mas de 60 días) Y pagadas (saldo <= 0)
+      // No borramos las que tengan saldo pendiente.
+      final facturasParaBorrar = await db.query(
+        'factura',
+        columns: ['id'],
+        where: 'fecha < ? AND saldoPendiente <= 0',
+        whereArgs: [fechaLimite],
+      );
+
+      final idsFacturas = facturasParaBorrar.map((f) => f['id'] as int).toList();
+
+      if (idsFacturas.isNotEmpty) {
+        final idsString = idsFacturas.join(',');
+
+        // Borra los detalles de esas facturas
+        await db.execute('DELETE FROM detalle_factura WHERE facturaId IN ($idsString)');
+
+        // Borra la relación con los cargues (si existía)
+        await db.execute('DELETE FROM cargue_factura WHERE facturaId IN ($idsString)');
+
+        // Finalmente borra la factura
+        await db.execute('DELETE FROM factura WHERE id IN ($idsString)');
+
+        print('🧹 Limpieza: Se eliminaron ${idsFacturas.length} facturas antiguas y pagadas.');
+      }
+
+      // 2. ELIMINAR CARGUES ANTIGUOS
+      // Borra los cargues viejos.
+      final carguesParaBorrar = await db.query(
+        'cargue',
+        columns: ['id'],
+        where: 'fecha < ?',
+        whereArgs: [fechaLimite],
+      );
+
+      final idsCargues = carguesParaBorrar.map((c) => c['id'] as int).toList();
+
+      if (idsCargues.isNotEmpty) {
+        final idsCarguesString = idsCargues.join(',');
+
+        // Borra la relación cargue-factura
+        await db.execute('DELETE FROM cargue_factura WHERE cargueId IN ($idsCarguesString)');
+
+        // Borra el cargue
+        await db.execute('DELETE FROM cargue WHERE id IN ($idsCarguesString)');
+
+        print('🚛 Limpieza: Se eliminaron ${idsCargues.length} cargues antiguos.');
+      }
+
+    } catch (e) {
+      print('Error durante la limpieza automática: $e');
+    }
+  }
+
 }

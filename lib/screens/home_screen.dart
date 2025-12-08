@@ -7,7 +7,7 @@ import 'cargue_screen.dart';
 import 'cargue_historial_screen.dart';
 import 'cierre_dia_screen.dart';
 import 'liquidacion_cargue_screen.dart';
-//import '../db/db_helper.dart';
+import '../db/db_helper.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -159,6 +159,22 @@ class HomeScreen extends StatelessWidget {
               minimumSize: const Size(double.infinity, 50),
             ),
           ),
+          const SizedBox(height: 20),
+
+          ElevatedButton.icon(
+            onPressed: () async {
+              // Llama a la función de exportar
+              await DBHelper.exportarBaseDeDatos();
+            },
+            icon: const Icon(Icons.backup),
+            label: const Text('Enviar Backup (DB)'),
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 50),
+              backgroundColor: Colors.teal.shade700, // Un color verde oscuro para diferenciarlo
+              foregroundColor: Colors.white,
+            ),
+          ),
+
           const SizedBox(height: 20),
 
           /*ElevatedButton.icon( // boton para pruebas

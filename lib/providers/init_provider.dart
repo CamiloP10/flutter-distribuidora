@@ -15,6 +15,7 @@ class InitProvider with ChangeNotifier {
 
     try {
       await DBHelper.initDb();
+      await DBHelper.limpiarDatosAntiguos();//para eliminar datos antiguos al iniciar la app
       await DBHelper.importarInventarioDesdeCSV();
       await DBHelper.importarClientesDesdeCSV();
     } catch (e) {
