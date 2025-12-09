@@ -315,7 +315,8 @@ class PdfGenerator {
     required double totalDevoluciones,
     required double totalCreditos,
     required double totalNequi,
-    required double totalRecibido, // Esto ahora es solo el efectivo
+    required double totalRecaudoCreditos,
+    required double totalRecibido,
     required Map<String, int> cantidades,
     required Map<String, double> subtotales,
     required double monedas,
@@ -335,8 +336,17 @@ class PdfGenerator {
       '2k': '\$2.000',
     };
 
-    // --- LÓGICA DE CÁLCULO ACTUALIZADA ---
-    final double efectivoEsperado = totalVendido - totalDevoluciones - totalCreditos - totalNequi;
+    final double efectivoEsperado = (totalVendido - totalDevoluciones - totalCreditos - totalNequi) + totalRecaudoCreditos;
+    final double diferencia = totalRecibido - efectivoEsperado;
+
+    // --- LÓGICA DE ETIQUETA PARA EL PDF ---
+    String labelDiferencia = 'Diferencia:';
+    PdfColor colorDiferencia = PdfColors.black;
+    if (diferencia < 0) {
+      labelDiferencia = 'Faltante:';
+    } else if (diferencia > 0) {
+      labelDiferencia = 'A favor:';
+    }
 
     pdf.addPage(
       pw.MultiPage(
@@ -355,7 +365,7 @@ class PdfGenerator {
               style: const pw.TextStyle(fontSize: 9)),
           pw.Divider(),
 
-          // --- Totales Generales (ACTUALIZADO) ---
+          // --- Totales Generales ---
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
@@ -377,19 +387,27 @@ class PdfGenerator {
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              pw.Text('Créditos:',
+              pw.Text('Créditos (Nuevos):',
                   style: const pw.TextStyle(fontSize: 9)),
               pw.Text('- \$${formatMiles.format(totalCreditos)}',
                   style: const pw.TextStyle(fontSize: 9)),
             ],
           ),
-          // --- NUEVA LÍNEA NEQUI (MOVIDA AQUÍ) ---
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              pw.Text('Nequi:',
+              pw.Text('Nequi (Virtual):',
                   style: const pw.TextStyle(fontSize: 9)),
               pw.Text('- \$${formatMiles.format(totalNequi)}',
+                  style: const pw.TextStyle(fontSize: 9)),
+            ],
+          ),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text('Anteriores Créditos:',
+                  style: const pw.TextStyle(fontSize: 9)),
+              pw.Text('+ \$${formatMiles.format(totalRecaudoCreditos)}',
                   style: const pw.TextStyle(fontSize: 9)),
             ],
           ),
@@ -408,29 +426,29 @@ class PdfGenerator {
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              pw.Text('Efectivo Recibido:', // <-- Texto actualizado
+              pw.Text('Efectivo Recibido:',
                   style: pw.TextStyle(
                       fontSize: 10, fontWeight: pw.FontWeight.bold)),
               pw.Text('\$${formatMiles.format(totalRecibido)}',
-                  style: pw.TextStyle(
-                      fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                  style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
             ],
           ),
+          // --- LÓGICA DINÁMICA ---
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
-              pw.Text('Diferencia:',
+              pw.Text(labelDiferencia, // <-- Etiqueta dinámica
                   style: pw.TextStyle(
                       fontSize: 10, fontWeight: pw.FontWeight.bold)),
-              pw.Text('\$${formatMiles.format(totalRecibido - efectivoEsperado)}',
+              pw.Text('\$${formatMiles.format(diferencia)}',
                   style: pw.TextStyle(
-                      fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                      fontSize: 10, fontWeight: pw.FontWeight.bold, color: colorDiferencia)), // <-- Color dinámico
             ],
           ),
           pw.Divider(),
 
-          // --- Arqueo de Caja (ACTUALIZADO) ---
-          pw.Text('ARQUEO DE CAJA (EFECTIVO)', // <-- Texto actualizado
+          // --- Arqueo de Caja ---
+          pw.Text('ARQUEO DE CAJA (EFECTIVO)',
               style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
           ...etiquetas.keys.map((key) {
             final cantidad = cantidades[key] ?? 0;
@@ -456,10 +474,9 @@ class PdfGenerator {
                     style: const pw.TextStyle(fontSize: 8)),
               ],
             ),
-          // (La línea de Nequi se quitó de aquí)
           pw.Divider(),
 
-          // --- Cargues Liquidados (con total por cargue) ---
+          // --- Cargues Liquidados ---
           pw.Text('CARGUES LIQUIDADOS',
               style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
           pw.SizedBox(height: 5),
@@ -490,10 +507,8 @@ class PdfGenerator {
                   ],
                 ),
                 pw.SizedBox(height: 3),
-                pw.Text(
-                  'Obs:',
-                  style: const pw.TextStyle(fontSize: 7),
-                ),
+                pw.Text('Obs:', style: const pw.TextStyle(fontSize: 7)),
+                pw.Divider(thickness: 0.5, height: 12),
                 pw.Divider(thickness: 0.5, height: 12),
                 pw.SizedBox(height: 10),
               ],
