@@ -8,6 +8,7 @@ import 'cargue_historial_screen.dart';
 import 'cierre_dia_screen.dart';
 import 'liquidacion_cargue_screen.dart';
 import '../db/db_helper.dart';
+import 'historial_liquidaciones_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -141,6 +142,24 @@ class HomeScreen extends StatelessWidget {
             label: const Text('Liquidación Cargues'),
             style: ElevatedButton.styleFrom(
               minimumSize: const Size(double.infinity, 50),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const HistorialLiquidacionesScreen()),
+              );
+            },
+            icon: const Icon(Icons.history_edu),
+            label: const Text('Historial Liquidaciones'),
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 50),
+              backgroundColor: Colors.blueGrey.shade800, // Color distintivo
+              foregroundColor: Colors.white,
             ),
           ),
           const SizedBox(height: 20),

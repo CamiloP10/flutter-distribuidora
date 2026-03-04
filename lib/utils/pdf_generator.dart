@@ -311,6 +311,8 @@ class PdfGenerator {
 
   // para las liquidaciones de cargues
   static Future<Uint8List> generarLiquidacionPDF({
+    int? liquidacionId,
+    DateTime? fechaManual,
     required double totalVendido,
     required double totalDevoluciones,
     required double totalCreditos,
@@ -322,195 +324,140 @@ class PdfGenerator {
     required double monedas,
     required List<Cargue> carguesLiquidados,
     required List<Factura> todasLasFacturas,
+    required List<Cliente> todosLosClientes,
   }) async {
     final pdf = pw.Document();
     final formatMiles = NumberFormat('#,###', 'es_CO');
     final formatFecha = DateFormat('yyyy-MM-dd HH:mm');
 
+    final String fechaTexto = formatFecha.format(fechaManual ?? DateTime.now());
+    final String tituloId = liquidacionId != null ? ' #$liquidacionId' : '';
+
     final Map<String, String> etiquetas = {
-      '100k': '\$100.000',
-      '50k': '\$50.000',
-      '20k': '\$20.000',
-      '10k': '\$10.000',
-      '5k': '\$5.000',
-      '2k': '\$2.000',
+      '100k': '\$100.000', '50k': '\$50.000', '20k': '\$20.000',
+      '10k': '\$10.000', '5k': '\$5.000', '2k': '\$2.000',
     };
 
     final double efectivoEsperado = (totalVendido - totalDevoluciones - totalCreditos - totalNequi) + totalRecaudoCreditos;
     final double diferencia = totalRecibido - efectivoEsperado;
 
-    // --- LÓGICA DE ETIQUETA PARA EL PDF ---
     String labelDiferencia = 'Diferencia:';
-    PdfColor colorDiferencia = PdfColors.black;
-    if (diferencia < 0) {
-      labelDiferencia = 'Faltante:';
-    } else if (diferencia > 0) {
-      labelDiferencia = 'A favor:';
-    }
+    if (diferencia < 0) labelDiferencia = 'Faltante:';
+    else if (diferencia > 0) labelDiferencia = 'A favor:';
 
     pdf.addPage(
       pw.MultiPage(
-        pageFormat:
-        PdfPageFormat(58 * PdfPageFormat.mm, PdfPageFormat.a4.height),
+        pageFormat: PdfPageFormat(58 * PdfPageFormat.mm, PdfPageFormat.a4.height),
         margin: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 10),
         build: (context) => [
+          // 1. ENCABEZADO
           pw.Center(
             child: pw.Text(
-              'LIQUIDACIÓN DE CAJA',
+              'LIQUIDACIÓN DE CAJA$tituloId',
               style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
             ),
           ),
-          pw.SizedBox(height: 6),
-          pw.Text('Fecha: ${formatFecha.format(DateTime.now())}',
-              style: const pw.TextStyle(fontSize: 9)),
-          pw.Divider(),
-
-          // --- Totales Generales ---
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Text('Total Vendido:',
-                  style: const pw.TextStyle(fontSize: 9)),
-              pw.Text('\$${formatMiles.format(totalVendido)}',
-                  style: const pw.TextStyle(fontSize: 9)),
-            ],
-          ),
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Text('Devoluciones:',
-                  style: const pw.TextStyle(fontSize: 9)),
-              pw.Text('- \$${formatMiles.format(totalDevoluciones)}',
-                  style: const pw.TextStyle(fontSize: 9)),
-            ],
-          ),
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Text('Créditos (Nuevos):',
-                  style: const pw.TextStyle(fontSize: 9)),
-              pw.Text('- \$${formatMiles.format(totalCreditos)}',
-                  style: const pw.TextStyle(fontSize: 9)),
-            ],
-          ),
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Text('Nequi (Virtual):',
-                  style: const pw.TextStyle(fontSize: 9)),
-              pw.Text('- \$${formatMiles.format(totalNequi)}',
-                  style: const pw.TextStyle(fontSize: 9)),
-            ],
-          ),
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Text('Anteriores Créditos:',
-                  style: const pw.TextStyle(fontSize: 9)),
-              pw.Text('+ \$${formatMiles.format(totalRecaudoCreditos)}',
-                  style: const pw.TextStyle(fontSize: 9)),
-            ],
-          ),
+          pw.SizedBox(height: 4),
+          pw.Text('Fecha: $fechaTexto', style: const pw.TextStyle(fontSize: 8)),
           pw.Divider(thickness: 0.5),
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Text('Efectivo Esperado:',
-                  style: pw.TextStyle(
-                      fontSize: 10, fontWeight: pw.FontWeight.bold)),
-              pw.Text('\$${formatMiles.format(efectivoEsperado)}',
-                  style: pw.TextStyle(
-                      fontSize: 10, fontWeight: pw.FontWeight.bold)),
-            ],
-          ),
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Text('Efectivo Recibido:',
-                  style: pw.TextStyle(
-                      fontSize: 10, fontWeight: pw.FontWeight.bold)),
-              pw.Text('\$${formatMiles.format(totalRecibido)}',
-                  style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
-            ],
-          ),
-          // --- LÓGICA DINÁMICA ---
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-            children: [
-              pw.Text(labelDiferencia, // <-- Etiqueta dinámica
-                  style: pw.TextStyle(
-                      fontSize: 10, fontWeight: pw.FontWeight.bold)),
-              pw.Text('\$${formatMiles.format(diferencia)}',
-                  style: pw.TextStyle(
-                      fontSize: 10, fontWeight: pw.FontWeight.bold, color: colorDiferencia)), // <-- Color dinámico
-            ],
-          ),
+
+          // 2. TOTALES GENERALES
+          _filaPdf('Total Vendido:', totalVendido, formatMiles),
+          _filaPdf('Devoluciones:', -totalDevoluciones, formatMiles),
+          _filaPdf('Créditos (Nuevos):', -totalCreditos, formatMiles),
+          _filaPdf('Nequi (Virtual):', -totalNequi, formatMiles),
+          _filaPdf('Recaudos:', totalRecaudoCreditos, formatMiles),
+          pw.Divider(thickness: 0.5),
+
+          // 3. BALANCE FINAL
+          _filaPdf('Efectivo Esperado:', efectivoEsperado, formatMiles, bold: true),
+          _filaPdf('Efectivo Recibido:', totalRecibido, formatMiles, bold: true),
+          _filaPdf(labelDiferencia, diferencia, formatMiles, bold: true),
           pw.Divider(),
 
-          // --- Arqueo de Caja ---
-          pw.Text('ARQUEO DE CAJA (EFECTIVO)',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
+          // 4. ARQUEO DE BILLETES
+          pw.Text('ARQUEO DE CAJA', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
           ...etiquetas.keys.map((key) {
-            final cantidad = cantidades[key] ?? 0;
-            final subtotal = subtotales[key] ?? 0;
-            if (cantidad == 0) return pw.Container();
-
-            return pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Text('${etiquetas[key]} x ${cantidad}',
-                    style: const pw.TextStyle(fontSize: 8)),
-                pw.Text('\$${formatMiles.format(subtotal)}',
-                    style: const pw.TextStyle(fontSize: 8)),
-              ],
-            );
+            final cant = cantidades[key] ?? 0;
+            final sub = subtotales[key] ?? 0;
+            if (cant == 0) return pw.SizedBox();
+            return _filaPdf('${etiquetas[key]} x $cant', sub, formatMiles, small: true);
           }).toList(),
-          if (monedas > 0)
-            pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Text('Monedas:', style: const pw.TextStyle(fontSize: 8)),
-                pw.Text('\$${formatMiles.format(monedas)}',
-                    style: const pw.TextStyle(fontSize: 8)),
-              ],
-            ),
+          if (monedas > 0) _filaPdf('Monedas:', monedas, formatMiles, small: true),
           pw.Divider(),
 
-          // --- Cargues Liquidados ---
-          pw.Text('CARGUES LIQUIDADOS',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
-          pw.SizedBox(height: 5),
-
+          // 5. CARGUES LIQUIDADOS (Versión Final con Nombres de Clientes)
+          pw.Text('CARGUES VINCULADOS', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+          pw.SizedBox(height: 4),
           ...carguesLiquidados.map((cargue) {
-            final double totalDelCargue = todasLasFacturas
-                .where((factura) => cargue.facturaIds.contains(factura.id))
-                .fold(0.0, (sum, factura) => sum + (factura.total ?? 0));
+            final facturasDeEsteCargue = todasLasFacturas
+                .where((f) => cargue.facturaIds.contains(f.id))
+                .toList();
+
+            final double totalDelCargue = facturasDeEsteCargue.fold(0.0, (sum, f) => sum + (f.total ?? 0));
 
             return pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Expanded(
-                      child: pw.Text(
-                        '#${cargue.id} - ${cargue.vehiculoAsignado} (${cargue.conductor})',
-                        style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
+                pw.Container(
+                  color: PdfColors.grey200,
+                  padding: const pw.EdgeInsets.all(2),
+                  child: pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Expanded(
+                        child: pw.Text('#${cargue.id} - ${cargue.vehiculoAsignado}',
+                            style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold)),
                       ),
-                    ),
-                    pw.SizedBox(width: 5),
-                    pw.Text(
-                      '\$${formatMiles.format(totalDelCargue)}',
-                      style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold),
-                    ),
-                  ],
+                      pw.Text('\$${formatMiles.format(totalDelCargue)}',
+                          style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold)),
+                    ],
+                  ),
                 ),
-                pw.SizedBox(height: 3),
-                pw.Text('Obs:', style: const pw.TextStyle(fontSize: 7)),
-                pw.Divider(thickness: 0.5, height: 12),
-                pw.Divider(thickness: 0.5, height: 12),
-                pw.SizedBox(height: 10),
+                pw.Text('Cond: ${cargue.conductor}', style: const pw.TextStyle(fontSize: 6.5)),
+                pw.SizedBox(height: 2),
+
+                ...facturasDeEsteCargue.map((f) {
+                  // LÓGICA DE BÚSQUEDA DEL CLIENTE
+                  final clienteEncontrado = todosLosClientes.firstWhere(
+                        (c) => c.id == f.clienteId,
+                    orElse: () => Cliente(nombre: 'Cliente #${f.clienteId}', telefono: '', informacion: ''),
+                  );
+
+                  return pw.Padding(
+                    padding: const pw.EdgeInsets.only(left: 4, top: 2),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Row(
+                          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                          children: [
+                            pw.Expanded(
+                              child: pw.Text(
+                                // Aquí usamos clienteEncontrado.nombre que viene de tu modelo Cliente
+                                'Fact ${f.id}: ${clienteEncontrado.nombre}',
+                                style: const pw.TextStyle(fontSize: 6.5),
+                              ),
+                            ),
+                            pw.Text('\$${formatMiles.format(f.total)}',
+                                style: const pw.TextStyle(fontSize: 6.5)),
+                          ],
+                        ),
+                        // Opcional: Mostrar información adicional de la factura si existe
+                        if (f.informacion.isNotEmpty)
+                          pw.Text('Ref: ${f.informacion}', style: const pw.TextStyle(fontSize: 5.5, color: PdfColors.grey)),
+
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.only(bottom: 2),
+                          child: pw.Text('Obs: _________________________________',
+                              style: pw.TextStyle(fontSize: 5, color: PdfColors.grey700)),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+
+                pw.Divider(thickness: 0.3, height: 10, color: PdfColors.grey400),
               ],
             );
           }).toList(),
@@ -518,5 +465,20 @@ class PdfGenerator {
       ),
     );
     return pdf.save();
+  }
+
+// Función auxiliar para las filas (Añádela dentro de la misma clase PdfGenerator)
+  static pw.Widget _filaPdf(String label, double valor, NumberFormat format, {bool bold = false, bool small = false}) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 1),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text(label, style: pw.TextStyle(fontSize: small ? 7 : 8, fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal)),
+          pw.Text(valor < 0 ? '-\$${format.format(valor.abs())}' : '\$${format.format(valor)}',
+              style: pw.TextStyle(fontSize: small ? 7 : 8, fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal)),
+        ],
+      ),
+    );
   }
 }

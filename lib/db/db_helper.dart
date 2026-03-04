@@ -24,7 +24,8 @@ class DBHelper {
     //_db = await openDatabase(path, version: 1, onCreate: _onCreate); crea la Db desde 0
     _db = await openDatabase(
       path,
-      version: 2, //Aumenta la versión cuando se añada otra tabla a la db
+      version: 3, //Aumenta la versión cuando se añada otra tabla a la db (actualizado a 3 03/03/2026)
+      onConfigure: (db) async => await db.execute('PRAGMA foreign_keys = ON'),
       onCreate: _onCreate,
       onUpgrade: _onUpgrade, //actualiza para no borrar datos de las tablas anteriores
     );
@@ -94,9 +95,46 @@ class DBHelper {
         FOREIGN KEY (facturaId) REFERENCES factura(id)
   )
     ''');
+
+    // Tabla de Abonos oldVersion <2
+    await db.execute('''
+    CREATE TABLE abono (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      facturaId INTEGER,
+      monto REAL,
+      fecha TEXT,
+      FOREIGN KEY (facturaId) REFERENCES factura(id)
+    )
+  ''');
+
+    // Tablas liquidación y liquidación_cargue oldVersion <3
+    await db.execute('''
+  CREATE TABLE liquidacion (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fecha TEXT,
+    totalEfectivo REAL,
+    totalNequi REAL,
+    totalCreditosNuevos REAL,
+    totalCreditosAntiguos REAL,
+    totalDevoluciones REAL,
+    desgloseBilletes TEXT, 
+    totalFinal REAL,
+    observaciones TEXT
+  )
+''');
+
+    await db.execute('''
+  CREATE TABLE liquidacion_cargue (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    liquidacionId INTEGER,
+    cargueId INTEGER,
+    FOREIGN KEY (liquidacionId) REFERENCES liquidacion (id) ON DELETE CASCADE,
+    FOREIGN KEY (cargueId) REFERENCES cargue (id) ON DELETE CASCADE
+  )
+''');
   }
 
-  static Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+  static Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {//para quien viende de db2 v1
     if (oldVersion < 2) {
       await db.execute('''
       CREATE TABLE abono (
@@ -108,8 +146,36 @@ class DBHelper {
       )
     ''');
     }
-  }
 
+    if (oldVersion < 3) { // nuevas tablas para db 3 (v2.0 de la App)
+      // 1. Crear tabla principal de liquidación
+      await db.execute('''
+      CREATE TABLE liquidacion (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        fecha TEXT,
+        totalEfectivo REAL,
+        totalNequi REAL,
+        totalCreditosNuevos REAL,
+        totalCreditosAntiguos REAL,
+        totalDevoluciones REAL,
+        desgloseBilletes TEXT, 
+        totalFinal REAL,
+        observaciones TEXT
+      )
+    ''');
+
+      // 2. Crear tabla intermedia con los nuevos nombres
+      await db.execute('''
+      CREATE TABLE liquidacion_cargue (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        liquidacionId INTEGER,
+        cargueId INTEGER,
+        FOREIGN KEY (liquidacionId) REFERENCES liquidacion (id) ON DELETE CASCADE,
+        FOREIGN KEY (cargueId) REFERENCES cargue (id) ON DELETE CASCADE
+      )
+    ''');
+    }
+  }
 
   // PRODUCTOS
   static Future<int> insertarProducto(Producto producto) async {
@@ -352,6 +418,67 @@ class DBHelper {
     return Cliente.fromMap(maps.first);
   }
 
+  //MÉTODOS PARA LIQUIDACIONES (v2.0)
+
+// 1. Guardar la liquidación y sus relaciones con cargues (Transacción segura)
+  static Future<int> insertarLiquidacionCompleta(Map<String, dynamic> liquidacionMap, List<int> idsCargues) async {
+    final db = await initDb();
+
+    return await db.transaction((txn) async {
+      // Insertar la liquidación principal
+      int liquidacionId = await txn.insert('liquidacion', liquidacionMap);
+
+      // Insertar cada relación con los cargues seleccionados
+      for (var cargueId in idsCargues) {
+        await txn.insert('liquidacion_cargue', {
+          'liquidacionId': liquidacionId,
+          'cargueId': cargueId,
+        });
+      }
+      return liquidacionId;
+    });
+  }
+
+// 2. Obtener todas las liquidaciones realizadas
+  static Future<List<Map<String, dynamic>>> obtenerLiquidaciones() async {
+    final db = await initDb();
+    return await db.query('liquidacion', orderBy: 'fecha DESC');
+  }
+
+// 3. Obtener los cargues asociados a una liquidación específica
+  static Future<List<int>> obtenerIdsCarguesDeLiquidacion(int liquidacionId) async {
+    final db = await initDb();
+    final maps = await db.query(
+      'liquidacion_cargue',
+      columns: ['cargueId'],
+      where: 'liquidacionId = ?',
+      whereArgs: [liquidacionId],
+    );
+    return maps.map((e) => e['cargueId'] as int).toList();
+  }
+
+  static Future<List<Map<String, dynamic>>> obtenerCarguesPorLiquidacion(int liquidacionId) async {
+    final db = await initDb();
+    return await db.rawQuery('''
+    SELECT 
+      c.*, 
+      (SELECT SUM(f.total) FROM factura f 
+       INNER JOIN cargue_factura cf ON f.id = cf.facturaId 
+       WHERE cf.cargueId = c.id) as totalCargue,
+      (SELECT GROUP_CONCAT(facturaId) FROM cargue_factura WHERE cargueId = c.id) as idsDeFacturas
+    FROM cargue c
+    INNER JOIN liquidacion_cargue rel ON c.id = rel.cargueId
+    WHERE rel.liquidacionId = ?
+  ''', [liquidacionId]);
+  }
+
+  static Future<List<Map<String, dynamic>>> obtenerHistorialLiquidaciones() async {
+    final db = await initDb();
+    // Traemos las liquidaciones ordenadas por fecha descendente
+    return await db.query('liquidacion', orderBy: 'fecha DESC');
+  }
+
+
   //FUNCIÓN COPIA DE SEGURIDAD
   static Future<void> exportarBaseDeDatos() async {
     try {
@@ -387,17 +514,22 @@ class DBHelper {
     }
   }
 
-  // FUNCIÓN DE LIMPIEZA
+  // FUNCIÓN DE LIMPIEZA ACTUALIZADA v2.0
   static Future<void> limpiarDatosAntiguos() async {
     final db = await initDb();
-
-    // Calcula la fecha límite (hace 60 días)
-    final fechaLimite = DateTime.now().subtract(const Duration(days: 60)).toIso8601String();
+    final fechaLimite = DateTime.now().subtract(const Duration(days: 60)).toIso8601String();// Calcula la fecha límite (60 días)
 
     try {
-      // 1. ELIMINAR FACTURAS ANTIGUAS Y PAGADAS
-      // Buscar facturas viejas ( mas de 60 días) Y pagadas (saldo <= 0)
-      // No borramos las que tengan saldo pendiente.
+      // 1.ELIMINAR LIQUIDACIONES ANTIGUAS
+      // Al borrar la liquidación, la tabla 'liquidacion_cargue' se limpia sola racias al ON DELETE CASCADE
+      int liqBorradas = await db.delete(
+        'liquidacion',
+        where: 'fecha < ?',
+        whereArgs: [fechaLimite],
+      );
+      if(liqBorradas > 0) print('📊 Limpieza: Se eliminaron $liqBorradas liquidaciones antiguas.');
+
+      // 2. ELIMINAR FACTURAS ANTIGUAS Y PAGADAS
       final facturasParaBorrar = await db.query(
         'factura',
         columns: ['id'],
@@ -406,24 +538,16 @@ class DBHelper {
       );
 
       final idsFacturas = facturasParaBorrar.map((f) => f['id'] as int).toList();
-
       if (idsFacturas.isNotEmpty) {
         final idsString = idsFacturas.join(',');
 
-        // Borra los detalles de esas facturas
         await db.execute('DELETE FROM detalle_factura WHERE facturaId IN ($idsString)');
-
-        // Borra la relación con los cargues (si existía)
         await db.execute('DELETE FROM cargue_factura WHERE facturaId IN ($idsString)');
-
-        // Finalmente borra la factura
+        await db.execute('DELETE FROM abono WHERE facturaId IN ($idsString)');
         await db.execute('DELETE FROM factura WHERE id IN ($idsString)');
-
-        print('🧹 Limpieza: Se eliminaron ${idsFacturas.length} facturas antiguas y pagadas.');
+        print('🧹 Limpieza: Se eliminaron ${idsFacturas.length} facturas antiguas.');
       }
-
-      // 2. ELIMINAR CARGUES ANTIGUOS
-      // Borra los cargues viejos.
+      // 3. ELIMINAR CARGUES ANTIGUOS
       final carguesParaBorrar = await db.query(
         'cargue',
         columns: ['id'],
@@ -436,18 +560,13 @@ class DBHelper {
       if (idsCargues.isNotEmpty) {
         final idsCarguesString = idsCargues.join(',');
 
-        // Borra la relación cargue-factura
         await db.execute('DELETE FROM cargue_factura WHERE cargueId IN ($idsCarguesString)');
-
-        // Borra el cargue
+        await db.execute('DELETE FROM liquidacion_cargue WHERE cargueId IN ($idsCarguesString)');
         await db.execute('DELETE FROM cargue WHERE id IN ($idsCarguesString)');
-
         print('🚛 Limpieza: Se eliminaron ${idsCargues.length} cargues antiguos.');
       }
-
     } catch (e) {
       print('Error durante la limpieza automática: $e');
     }
   }
-
 }

@@ -9,6 +9,9 @@ import '../models/cargue.dart';
 import '../models/factura.dart';
 import '../providers/ventas_provider.dart';
 import '../utils/pdf_generator.dart';
+import 'dart:convert';
+import 'package:inv/db/db_helper.dart';
+import '../providers/cliente_provider.dart';
 
 class ThousandsInputFormatter extends TextInputFormatter {
   final NumberFormat _formatter = NumberFormat('#,##0', 'es_CO');
@@ -243,7 +246,38 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
                         setModalState(() => _isConfirming = true);
 
                         try {
+                          // 1. Preparar los datos para la base de datos
+                          final datosLiquidacion = {
+                            'fecha': DateTime.now().toIso8601String(),
+                            'totalEfectivo': totalRecibido,
+                            'totalNequi': tNequi,
+                            'totalCreditosNuevos': tCreditos,
+                            'totalCreditosAntiguos': tRecaudoCreditos,
+                            'totalDevoluciones': tDevoluciones,
+                            'desgloseBilletes': jsonEncode({
+                              'billetes': cantidades,
+                              'total_monedas': tMonedas,
+                            }),
+                            'totalFinal': totalVendido,
+                            'observaciones': 'Liquidación de ${carguesLiquidados.length} cargues',
+                          };
+
+                          final idsCargues = carguesLiquidados.map((c) => c.id).toList();
+
+                          // 2. Guardar en SQLite
+                          final int nuevoIdLiquidacion = await DBHelper.insertarLiquidacionCompleta(datosLiquidacion, idsCargues);
+
+                          // --- [CAMBIO AQUÍ] OBTENER CLIENTES PARA EL PDF ---
+                          final clienteProvider = Provider.of<ClienteProvider>(context, listen: false);
+                          // Por seguridad, si la lista está vacía, cargamos desde DB
+                          if (clienteProvider.clientes.isEmpty) {
+                            await clienteProvider.cargarClientes();
+                          }
+                          // ------------------------------------------------
+
+                          // 3. Generar el PDF (Ahora con todos los parámetros)
                           final pdfBytes = await PdfGenerator.generarLiquidacionPDF(
+                            liquidacionId: nuevoIdLiquidacion,
                             totalVendido: totalVendido,
                             totalDevoluciones: tDevoluciones,
                             totalCreditos: tCreditos,
@@ -255,10 +289,13 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
                             monedas: tMonedas,
                             carguesLiquidados: carguesLiquidados,
                             todasLasFacturas: todasLasFacturas,
+                            todosLosClientes: clienteProvider.clientes, // <--- NUEVO PARÁMETRO
                           );
 
                           final dir = await getTemporaryDirectory();
-                          final file = File('${dir.path}/liquidacion_${DateTime.now().millisecondsSinceEpoch}.pdf');
+                          // En lugar de usar DateTime.now().millisecondsSinceEpoch
+                          final String nombreArchivo = "Liquidacion_Caja_$nuevoIdLiquidacion.pdf";
+                          final file = File('${dir.path}/$nombreArchivo');
                           await file.writeAsBytes(pdfBytes);
 
                           await Share.shareXFiles(
@@ -268,12 +305,18 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
 
                           if (modalContext.mounted) {
                             Navigator.pop(modalContext);
+                            if (mounted) {
+                              setState(() {
+                                _carguesSeleccionados.clear();
+                              });
+                            }
                           }
 
                         } catch (e) {
+                          debugPrint("Error en liquidación: $e"); // Ayuda a debugear
                           if (modalContext.mounted) {
                             ScaffoldMessenger.of(modalContext).showSnackBar(
-                              SnackBar(content: Text('Error al generar PDF: $e')),
+                              SnackBar(content: Text('Error en el proceso: $e')),
                             );
                           }
                         } finally {
@@ -285,7 +328,7 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
                       style: ElevatedButton.styleFrom(
                           minimumSize: const Size(double.infinity, 50)),
                       child: _isConfirming
-                          ? const CircularProgressIndicator()
+                          ? const CircularProgressIndicator(color: Colors.white)
                           : const Text('Confirmar Liquidación y Generar PDF'),
                     )
                   ],
@@ -395,14 +438,18 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
           Padding(
             padding: const EdgeInsets.all(12.0),
             child: DropdownButtonFormField<int>(
+              key: UniqueKey(), // <-- ESTO ES CLAVE: Obliga a Flutter a refrescar el widget limpiamente
               hint: const Text('Seleccione un cargue para añadir...'),
-              value: null,
+              value: null, // Mantenerlo en null para que siempre muestre el hint
               isExpanded: true,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.add),
               ),
-              items: carguesDisponibles.map((cargue) {
+              // Filtramos para que no aparezcan los que ya seleccionamos (opcional pero recomendado)
+              items: carguesDisponibles
+                  .where((c) => !_carguesSeleccionados.contains(c.id))
+                  .map((cargue) {
                 return DropdownMenuItem<int>(
                   value: cargue.id,
                   child: Text(
@@ -414,6 +461,7 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
               onChanged: (int? selectedId) {
                 if (selectedId != null) {
                   setState(() {
+                    // Añadimos el ID a la lista de seleccionados
                     _carguesSeleccionados.add(selectedId);
                   });
                 }
