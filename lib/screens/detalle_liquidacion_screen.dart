@@ -82,7 +82,7 @@ class DetalleLiquidacionScreen extends StatelessWidget {
               icon: const Icon(Icons.picture_as_pdf),
               label: const Text('GENERAR / COMPARTIR PDF'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red.shade900,
+                backgroundColor: Colors.blue,
                 foregroundColor: Colors.white,
                 minimumSize: const Size(double.infinity, 50),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
-import 'inventario_screen.dart';
-import 'clientes_screen.dart';
 import 'factura_screen.dart';
 import 'ventas_screen.dart';
 import 'cargue_screen.dart';
 import 'cargue_historial_screen.dart';
-import 'cierre_dia_screen.dart';
 import 'liquidacion_cargue_screen.dart';
-import '../db/db_helper.dart';
 import 'historial_liquidaciones_screen.dart';
+import 'administracion_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -18,197 +15,119 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'DISTRIBUIDORA  LA BELLEZA',
-          style: TextStyle(color: Colors.white54),
+          'DISTRIBUIDORA LA BELLEZA',
+          style: TextStyle(color: Colors.white54, fontSize: 18, fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.black,
+        centerTitle: true,
       ),
-      // --- CAMBIO AQUÍ ---
-      // 1. Reemplazamos el 'Padding' y 'Column' por un 'ListView'.
-      // 2. Movimos el padding de 'Padding' al 'ListView' usando la propiedad 'padding'.
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         children: [
-          const SizedBox(height: 20),
-
+          const SizedBox(height: 10),
           // LOGO
-          Image.asset(
-            'assets/icon.png', // ruta del logo
-            height: 130,
+          Image.asset('assets/icon.png', height: 180),
+          const SizedBox(height: 25),
+
+          // SECCIÓN FACTURACIÓN
+          _buildSeccionAgrupada(
+            context,
+            titulo: 'FACTURACIÓN',
+            botones: [
+              _botonGrid(context, 'Nueva', Icons.receipt_long_outlined, const FacturaScreen(), color: Colors.blue.shade700),
+              _botonGrid(context, 'Historial', Icons.shopify, VentasScreen(), color: Colors.blue.shade700),
+            ],
           ),
+
+          // SECCIÓN CARGUES
+          _buildSeccionAgrupada(
+            context,
+            titulo: 'CARGUES',
+            botones: [
+              _botonGrid(context, 'Asignar', Icons.local_shipping, const CargueScreen(), color: Colors.indigo.shade600),
+              _botonGrid(context, 'Historial', Icons.delivery_dining, const CargueHistorialScreen(), color: Colors.indigo.shade600),
+            ],
+          ),
+
+          // SECCIÓN LIQUIDACIÓN
+          _buildSeccionAgrupada(
+            context,
+            titulo: 'LIQUIDACIÓN',
+            botones: [
+              _botonGrid(context, 'Liquidar', Icons.calculate, const LiquidacionCargueScreen(), color: Colors.teal.shade700),
+              _botonGrid(context, 'Historial', Icons.history_edu, const HistorialLiquidacionesScreen(), color: Colors.teal.shade700),
+            ],
+          ),
+
           const SizedBox(height: 20),
 
-          // BOTONES
+          // BOTÓN ADMINISTRAR
           ElevatedButton.icon(
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const FacturaScreen()),
+                MaterialPageRoute(builder: (context) => const AdministracionScreen()),
               );
             },
-            icon: const Icon(Icons.receipt_long),
-            label: const Text('Crear Factura'),
+            icon: const Icon(Icons.settings_suggest),
+            label: const Text('ADMINISTRAR', style: TextStyle(letterSpacing: 1.2, fontWeight: FontWeight.bold)),
             style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 50),
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => VentasScreen()),
-              );
-            },
-            icon: const Icon(Icons.shopify),
-            label: const Text('Ventas'),
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 50),
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => InventarioScreen()),
-              );
-            },
-            icon: const Icon(Icons.inventory),
-            label: const Text('Inventario'),
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 50),
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => ClientesScreen()),
-              );
-            },
-            icon: const Icon(Icons.people),
-            label: const Text('Clientes'),
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 50),
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const CargueScreen()),
-              );
-            },
-            icon: const Icon(Icons.fire_truck),
-            label: const Text('Asignar Cargue'),
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 50),
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const CargueHistorialScreen()),
-              );
-            },
-            icon: const Icon(Icons.delivery_dining),
-            label: const Text('Historial Cargues'),
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 50),
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const LiquidacionCargueScreen()),
-              );
-            },
-            icon: const Icon(Icons.request_quote),
-            label: const Text('Liquidación Cargues'),
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 50),
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const HistorialLiquidacionesScreen()),
-              );
-            },
-            icon: const Icon(Icons.history_edu),
-            label: const Text('Historial Liquidaciones'),
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 50),
-              backgroundColor: Colors.blueGrey.shade800, // Color distintivo
+              minimumSize: const Size(double.infinity, 60),
+              backgroundColor: Colors.black87,
               foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),
           const SizedBox(height: 20),
-
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => const CierreDiaScreen()),
-              );
-            },
-            icon: const Icon(Icons.checklist_rounded),
-            label: const Text('Cierre del Día'),
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 50),
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          ElevatedButton.icon(
-            onPressed: () async {
-              // Llama a la función de exportar
-              await DBHelper.exportarBaseDeDatos();
-            },
-            icon: const Icon(Icons.backup),
-            label: const Text('Enviar Backup (DB)'),
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 50),
-              backgroundColor: Colors.teal.shade700, // Un color verde oscuro para diferenciarlo
-              foregroundColor: Colors.white,
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          /*ElevatedButton.icon( // boton para pruebas
-              onPressed: () async {
-                final db = await DBHelper.initDb();
-                final tablas = await db.rawQuery("SELECT name FROM sqlite_master WHERE type='table'");
-                print('🔍 Tablas en la base de datos:');
-                for (var t in tablas) {
-                  print('📁 ${t['name']}');
-                }
-              },
-              icon: Icon(Icons.search),
-              label: Text('Verificar Tablas de datos DB'),
-            ),*/
         ],
+      ),
+    );
+  }
+
+  // --- WIDGET QUE CREA EL RECUADRO CON TÍTULO EN LA LÍNEA ---
+  Widget _buildSeccionAgrupada(BuildContext context, {required String titulo, required List<Widget> botones}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 25),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: titulo,
+          labelStyle: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+          // Borde que encierra los botones
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.grey, width: 1.5),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.only(top: 8), // Espacio entre el título y los botones
+          child: Row(
+            children: [
+              Expanded(child: botones[0]),
+              const SizedBox(width: 12),
+              Expanded(child: botones[1]),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _botonGrid(BuildContext context, String texto, IconData icono, Widget pantalla, {Color? color}) {
+    return ElevatedButton.icon(
+      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => pantalla)),
+      icon: Icon(icono, size: 18),
+      label: Text(texto, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+      style: ElevatedButton.styleFrom(
+        minimumSize: const Size(0, 50),
+        backgroundColor: color ?? Colors.blue.shade700,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        elevation: 1,
       ),
     );
   }
