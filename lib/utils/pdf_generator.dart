@@ -370,13 +370,13 @@ class PdfGenerator {
           pw.Divider(thickness: 0.5),
 
           // 3. BALANCE FINAL
-          _filaPdf('Efectivo Esperado:', efectivoEsperado, formatMiles, bold: true),
-          _filaPdf('Efectivo Recibido:', totalRecibido, formatMiles, bold: true),
+          _filaPdf('Efect. Esperado:', efectivoEsperado, formatMiles, bold: true),
+          _filaPdf('Efect. Recibido:', totalRecibido, formatMiles, bold: true),
           _filaPdf(labelDiferencia, diferencia, formatMiles, bold: true),
           pw.Divider(),
 
           // 4. ARQUEO DE BILLETES
-          pw.Text('ARQUEO DE CAJA', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+          pw.Text('ARQUEO DE CAJA', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
           ...etiquetas.keys.map((key) {
             final cant = cantidades[key] ?? 0;
             final sub = subtotales[key] ?? 0;
@@ -387,7 +387,7 @@ class PdfGenerator {
           pw.Divider(),
 
           // 5. CARGUES LIQUIDADOS (Versión Final con Nombres de Clientes)
-          pw.Text('CARGUES VINCULADOS', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 8)),
+          pw.Text('CARGUES VINCULADOS', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
           pw.SizedBox(height: 4),
           ...carguesLiquidados.map((cargue) {
             final facturasDeEsteCargue = todasLasFacturas
@@ -407,14 +407,14 @@ class PdfGenerator {
                     children: [
                       pw.Expanded(
                         child: pw.Text('#${cargue.id} - ${cargue.vehiculoAsignado}',
-                            style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold)),
+                            style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
                       ),
                       pw.Text('\$${formatMiles.format(totalDelCargue)}',
-                          style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold)),
+                          style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
                     ],
                   ),
                 ),
-                pw.Text('Cond: ${cargue.conductor}', style: const pw.TextStyle(fontSize: 6.5)),
+                pw.Text('Conductor: ${cargue.conductor}', style: const pw.TextStyle(fontSize: 8.5)),
                 pw.SizedBox(height: 2),
 
                 ...facturasDeEsteCargue.map((f) {
@@ -436,21 +436,17 @@ class PdfGenerator {
                               child: pw.Text(
                                 // Aquí usamos clienteEncontrado.nombre que viene de tu modelo Cliente
                                 'Fact ${f.id}: ${clienteEncontrado.nombre}',
-                                style: const pw.TextStyle(fontSize: 6.5),
+                                style: const pw.TextStyle(fontSize: 8),
                               ),
                             ),
                             pw.Text('\$${formatMiles.format(f.total)}',
-                                style: const pw.TextStyle(fontSize: 6.5)),
+                                style: const pw.TextStyle(fontSize: 8)),
                           ],
                         ),
-                        // Opcional: Mostrar información adicional de la factura si existe
-                        if (f.informacion.isNotEmpty)
-                          pw.Text('Ref: ${f.informacion}', style: const pw.TextStyle(fontSize: 5.5, color: PdfColors.grey)),
-
                         pw.Padding(
                           padding: const pw.EdgeInsets.only(bottom: 2),
                           child: pw.Text('Obs: _________________________________',
-                              style: pw.TextStyle(fontSize: 5, color: PdfColors.grey700)),
+                              style: pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
                         ),
                       ],
                     ),
@@ -469,14 +465,30 @@ class PdfGenerator {
 
 // Función auxiliar para las filas (Añádela dentro de la misma clase PdfGenerator)
   static pw.Widget _filaPdf(String label, double valor, NumberFormat format, {bool bold = false, bool small = false}) {
+    // Si es 'small', le damos 9. Si no, le damos 11 (antes eran 7 y 8).
+    double tamanoLetra = small ? 9 : 11;
+
     return pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(vertical: 1),
+      padding: const pw.EdgeInsets.symmetric(vertical: 1.5), // Un poco más de espacio entre renglones
       child: pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
-          pw.Text(label, style: pw.TextStyle(fontSize: small ? 7 : 8, fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal)),
-          pw.Text(valor < 0 ? '-\$${format.format(valor.abs())}' : '\$${format.format(valor)}',
-              style: pw.TextStyle(fontSize: small ? 7 : 8, fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal)),
+          pw.Expanded(
+            child: pw.Text(
+              label,
+              style: pw.TextStyle(
+                  fontSize: tamanoLetra,
+                  fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal
+              ),
+            ),
+          ),
+          pw.Text(
+            valor < 0 ? '-\$${format.format(valor.abs())}' : '\$${format.format(valor)}',
+            style: pw.TextStyle(
+                fontSize: tamanoLetra,
+                fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal
+            ),
+          ),
         ],
       ),
     );
