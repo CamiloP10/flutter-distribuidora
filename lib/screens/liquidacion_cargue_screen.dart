@@ -87,6 +87,105 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
     return totalVendido;
   }
 
+  void _abrirDialogoDetalle( //Diálogo de Captura (Función de Apoyo para los JSON)
+      BuildContext context,
+      String titulo,
+      List<Map<String, dynamic>> lista,
+      VoidCallback onActualizar) {
+
+    final nameCtrl = TextEditingController();
+    final montoCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Añadir a $titulo'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'Nombre / Concepto'),
+              textCapitalization: TextCapitalization.words,
+            ),
+            TextField(
+              controller: montoCtrl,
+              decoration: const InputDecoration(labelText: 'Monto (\$)'),
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly, ThousandsInputFormatter()],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () {
+              if (nameCtrl.text.isNotEmpty && montoCtrl.text.isNotEmpty) {
+                final monto = double.tryParse(montoCtrl.text.replaceAll('.', '')) ?? 0;
+                lista.add({'nombre': nameCtrl.text, 'monto': monto});
+                onActualizar();
+                Navigator.pop(ctx);
+              }
+            },
+            child: const Text('Añadir'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Esta función crea el diseño de la lista que ves en pantalla
+  // Añadimos 'VoidCallback onRemove' al final de los parámetros
+  Widget _buildFilaDinamica(String label, List<Map<String, dynamic>> lista, Color color, VoidCallback onAdd, VoidCallback onRemove) {
+    double totalLista = lista.fold(0.0, (sum, item) => sum + item['monto']);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: color)),
+                const SizedBox(width: 8),
+                Text(currencyFormat.format(totalLista), style: TextStyle(color: color, fontSize: 13)),
+              ],
+            ),
+            IconButton(
+              icon: const Icon(Icons.add_circle, color: Colors.blue, size: 28),
+              onPressed: onAdd,
+            ),
+          ],
+        ),
+        if (lista.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(left: 12, bottom: 8),
+            child: Column(
+              children: lista.asMap().entries.map((entry) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    children: [
+                      Expanded(child: Text('• ${entry.value['nombre']}', style: const TextStyle(fontSize: 12))),
+                      Text(currencyFormat.format(entry.value['monto']), style: const TextStyle(fontSize: 12)),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                        onPressed: () {
+                          lista.removeAt(entry.key);
+                          onRemove(); // <--- Ahora usamos la función que pasamos por parámetro
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+      ],
+    );
+  }
+
   void _mostrarDialogoLiquidacion(
       BuildContext context,
       double totalVendido,
@@ -102,10 +201,6 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
     final c5k = TextEditingController();
     final c2k = TextEditingController();
     final cMonedas = TextEditingController();
-    final cNequi = TextEditingController();
-    final cDevoluciones = TextEditingController();
-    final cCreditos = TextEditingController();
-    final cRecaudoCreditos = TextEditingController();
 
     // Mapas de datos
     final Map<String, int> cantidades = {};
@@ -126,6 +221,12 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
       return double.tryParse(unformatted) ?? 0;
     }
 
+    // Listas para almacenar los desgloses dinámicos
+    List<Map<String, dynamic>> listaCreditosNuevos = [];
+    List<Map<String, dynamic>> listaCreditosAntiguos = [];
+    List<Map<String, dynamic>> listaNequi = [];
+    List<Map<String, dynamic>> listaDevoluciones = [];
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -134,6 +235,7 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
           builder: (modalContext, setModalState) {
 
             void recalcular() {
+              // 1. Cálculos de billetes (Efectivo Físico)
               cantidades['100k'] = int.tryParse(c100k.text.replaceAll('.', '')) ?? 0;
               cantidades['50k'] = int.tryParse(c50k.text.replaceAll('.', '')) ?? 0;
               cantidades['20k'] = int.tryParse(c20k.text.replaceAll('.', '')) ?? 0;
@@ -149,13 +251,20 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
               subtotales['2k'] = cantidades['2k']! * 2000.0;
 
               tMonedas = _parseFormatted(cMonedas.text);
-              tNequi = _parseFormatted(cNequi.text);
-              tDevoluciones = _parseFormatted(cDevoluciones.text);
-              tCreditos = _parseFormatted(cCreditos.text);
-              tRecaudoCreditos = _parseFormatted(cRecaudoCreditos.text);
 
+              // 2. Sumar montos de las listas dinámicas (JSON)
+              tNequi = listaNequi.fold(0.0, (sum, item) => sum + item['monto']);
+              tDevoluciones = listaDevoluciones.fold(0.0, (sum, item) => sum + item['monto']);
+              tCreditos = listaCreditosNuevos.fold(0.0, (sum, item) => sum + item['monto']);
+              tRecaudoCreditos = listaCreditosAntiguos.fold(0.0, (sum, item) => sum + item['monto']);
+
+              // 3. Totales Finales
+              // El esperado es lo vendido - lo que no es efectivo + lo recaudado de antes
               efectivoEsperado = (totalVendido - tDevoluciones - tCreditos - tNequi) + tRecaudoCreditos;
+
+              // El recibido es la suma de billetes + monedas
               totalRecibido = subtotales.values.fold(0.0, (a, b) => a + b) + tMonedas;
+
               diferencia = totalRecibido - efectivoEsperado;
 
               setModalState(() {});
@@ -193,17 +302,26 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
                         currencyFormat.format(totalVendido),
                         Colors.black),
 
-                    _buildInputRow('Devoluciones:', cDevoluciones, recalcular,
-                        prefix: '- \$ ', color: Colors.red),
 
-                    _buildInputRow('Créditos (Nuevos):', cCreditos, recalcular,
-                        prefix: '- \$ ', color: Colors.orange),
+                    const SizedBox(height: 10),
 
-                    _buildInputRow('Nequi (Virtual):', cNequi, recalcular,
-                        prefix: '- \$ ', color: Colors.purple, icon: Icons.phone_android),
+// --- NUEVAS FILAS DINÁMICAS ---
+                    _buildFilaDinamica('Devoluciones: -', listaDevoluciones, Colors.red, () {
+                      _abrirDialogoDetalle(context, 'Devoluciones', listaDevoluciones, recalcular);
+                    }, recalcular),
 
-                    _buildInputRow('Créditos (Antiguos):', cRecaudoCreditos, recalcular,
-                        prefix: '+ \$ ', color: Colors.teal[700], icon: Icons.account_balance_wallet),
+                    _buildFilaDinamica('Créditos (Nuevos): -', listaCreditosNuevos, Colors.orange, () {
+                      _abrirDialogoDetalle(context, 'Créditos Nuevos generados', listaCreditosNuevos, recalcular);
+                    }, recalcular),
+
+                    _buildFilaDinamica('Nequi (Virtual): -', listaNequi, Colors.purple, () {
+                      _abrirDialogoDetalle(context, 'Pagos recibidos por Nequi o virtual', listaNequi, recalcular);
+                    }, recalcular),
+
+                    _buildFilaDinamica('Créditos (Antiguos): +', listaCreditosAntiguos, Colors.teal, () {
+                      _abrirDialogoDetalle(context, 'Recaudo de Créditos Antiguos', listaCreditosAntiguos, recalcular);
+                    }, recalcular),
+// ------------------------------
 
                     const Divider(),
                     _buildTotalRow(
@@ -281,6 +399,11 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
                             }),
                             'totalFinal': totalVendido,
                             'observaciones': 'Liquidación de ${carguesLiquidados.length} cargues',
+                            // NUEVOS CAMPOS V4
+                            'detallesCreditosNuevos': jsonEncode(listaCreditosNuevos),
+                            'detallesCreditosAntiguos': jsonEncode(listaCreditosAntiguos),
+                            'detallesNequi': jsonEncode(listaNequi),
+                            'detallesDevoluciones': jsonEncode(listaDevoluciones),
                           };
 
                           final idsCargues = carguesLiquidados.map((c) => c.id).toList();
@@ -309,6 +432,11 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
                             todosLosClientes: clienteProv.clientes,
                             resumenVentas: resumenVentasFinal,    // Mapa procesado por el Provider
                             facturasDelCargue: facturasDelCargue, // Lista filtrada para el detalle final
+
+                            listaNequi: listaNequi,
+                            listaDevoluciones: listaDevoluciones,
+                            listaCreditosNuevos: listaCreditosNuevos,
+                            listaCreditosAntiguos: listaCreditosAntiguos,
                           );
 
                           // 7. Guardar temporalmente y compartir

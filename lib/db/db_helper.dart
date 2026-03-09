@@ -24,7 +24,7 @@ class DBHelper {
     //_db = await openDatabase(path, version: 1, onCreate: _onCreate); crea la Db desde 0
     _db = await openDatabase(
       path,
-      version: 3, //Aumenta la versión cuando se añada otra tabla a la db (actualizado a 3 03/03/2026)
+      version: 4, //Aumenta la versión cuando se añada otra tabla a la db (actualizado a 3 03/03/2026 (tabla liquidaciones), a 4 el 09/03/2026 (añadir espacios JSON))
       onConfigure: (db) async => await db.execute('PRAGMA foreign_keys = ON'),
       onCreate: _onCreate,
       onUpgrade: _onUpgrade, //actualiza para no borrar datos de las tablas anteriores
@@ -119,7 +119,11 @@ class DBHelper {
     totalDevoluciones REAL,
     desgloseBilletes TEXT, 
     totalFinal REAL,
-    observaciones TEXT
+    observaciones TEXT,
+    detallesCreditosNuevos TEXT,
+    detallesCreditosAntiguos TEXT,
+    detallesNequi TEXT,
+    detallesDevoluciones TEXT
   )
 ''');
 
@@ -174,6 +178,13 @@ class DBHelper {
         FOREIGN KEY (cargueId) REFERENCES cargue (id) ON DELETE CASCADE
       )
     ''');
+    }
+
+    if (oldVersion < 4) {// añade espacios a la tabla de liquidaciones
+      await db.execute("ALTER TABLE liquidacion ADD COLUMN detallesCreditosNuevos TEXT");
+      await db.execute("ALTER TABLE liquidacion ADD COLUMN detallesCreditosAntiguos TEXT");
+      await db.execute("ALTER TABLE liquidacion ADD COLUMN detallesNequi TEXT");
+      await db.execute("ALTER TABLE liquidacion ADD COLUMN detallesDevoluciones TEXT");
     }
   }
 

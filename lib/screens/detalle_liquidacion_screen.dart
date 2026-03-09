@@ -33,7 +33,15 @@ class DetalleLiquidacionScreen extends StatelessWidget {
     final fechaDt = DateTime.parse(fechaRaw);
     final desglose = jsonDecode(liquidacion['desgloseBilletes'] ?? '{}');
 
-    // Lógica de cálculos (se mantiene igual)
+    // --- NUEVO: Decodificar los detalles dinámicos de la DB ---
+    final List<Map<String, dynamic>> listaNequi =
+    List<Map<String, dynamic>>.from(jsonDecode(liquidacion['detallesNequi'] ?? '[]'));
+    final List<Map<String, dynamic>> listaDevoluciones =
+    List<Map<String, dynamic>>.from(jsonDecode(liquidacion['detallesDevoluciones'] ?? '[]'));
+    final List<Map<String, dynamic>> listaCreditosNuevos =
+    List<Map<String, dynamic>>.from(jsonDecode(liquidacion['detallesCreditosNuevos'] ?? '[]'));
+    final List<Map<String, dynamic>> listaCreditosAntiguos =
+    List<Map<String, dynamic>>.from(jsonDecode(liquidacion['detallesCreditosAntiguos'] ?? '[]'));
 
     // Lógica de cálculos con protección de tipos
     final double totalVendido = (liquidacion['totalFinal'] as num?)?.toDouble() ?? 0.0;
@@ -102,6 +110,11 @@ class DetalleLiquidacionScreen extends StatelessWidget {
               _fila('Anteriores Créditos', recaudos, f, color: Colors.green),
             ]),
 
+            // --- NUEVO: Mostrar desgloses detallados en pantalla ---
+            if (listaNequi.isNotEmpty || listaDevoluciones.isNotEmpty ||
+                listaCreditosNuevos.isNotEmpty || listaCreditosAntiguos.isNotEmpty)
+              _buildCardDesgloses(listaNequi, listaDevoluciones, listaCreditosNuevos, listaCreditosAntiguos, f),
+
             const SizedBox(height: 15),
 
             _buildCardSeccion('Balance de Efectivo', [
@@ -128,6 +141,8 @@ class DetalleLiquidacionScreen extends StatelessWidget {
             const SizedBox(height: 20),
             _buildExpansionBilletes(desglose, f),
             const SizedBox(height: 30),
+
+
           ],
         ),
       ),
@@ -149,6 +164,46 @@ class DetalleLiquidacionScreen extends StatelessWidget {
             ...hijos,
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildCardDesgloses(List<Map<String, dynamic>> nequi, List<Map<String, dynamic>> dev, List<Map<String, dynamic>> credN, List<Map<String, dynamic>> credA, NumberFormat f) {
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.only(top: 10),
+      child: ExpansionTile(
+        title: const Text('Detalle de Pagos / Novedades', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        children: [
+          if (nequi.isNotEmpty) _seccionMini('Pagos Nequi', nequi, f, Colors.blue),
+          if (dev.isNotEmpty) _seccionMini('Devoluciones', dev, f, Colors.orange),
+          if (credN.isNotEmpty) _seccionMini('Créditos Nuevos', credN, f, Colors.red),
+          if (credA.isNotEmpty) _seccionMini('Recaudos Ant.', credA, f, Colors.green),
+        ],
+      ),
+    );
+  }
+
+  Widget _seccionMini(String titulo, List<Map<String, dynamic>> lista, NumberFormat f, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(titulo, style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 13)),
+          const Divider(),
+          ...lista.map((item) => Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(item['nombre'], style: const TextStyle(fontSize: 12)),
+                Text(f.format(item['monto']), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          )),
+          const SizedBox(height: 10),
+        ],
       ),
     );
   }
@@ -393,7 +448,7 @@ class DetalleLiquidacionScreen extends StatelessWidget {
         '2k': (cantidadesMap['2k'] ?? 0) * 2000.0,
       };
 
-      // 5. LLAMADA CORREGIDA AL PDF (Sin los parámetros viejos)
+      // 5. LLAMADA CORREGIDA AL PDF (Con las 4 nuevas listas)
       final pdfBytes = await PdfGenerator.generarLiquidacionPDF(
         liquidacionId: idLiquidacion,
         fechaManual: fechaOriginal,
@@ -408,8 +463,12 @@ class DetalleLiquidacionScreen extends StatelessWidget {
         monedas: (desglose['total_monedas'] as num).toDouble(),
         carguesLiquidados: carguesList,
         todosLosClientes: clienteProv.clientes,
-        resumenVentas: resumenVentasFinal,    // <-- NUEVO
-        facturasDelCargue: facturasParaPDF,   // <-- NUEVO
+        resumenVentas: resumenVentasFinal,
+        facturasDelCargue: facturasParaPDF,
+        listaNequi: List<Map<String, dynamic>>.from(jsonDecode(liquidacion['detallesNequi'] ?? '[]')),
+        listaDevoluciones: List<Map<String, dynamic>>.from(jsonDecode(liquidacion['detallesDevoluciones'] ?? '[]')),
+        listaCreditosNuevos: List<Map<String, dynamic>>.from(jsonDecode(liquidacion['detallesCreditosNuevos'] ?? '[]')),
+        listaCreditosAntiguos: List<Map<String, dynamic>>.from(jsonDecode(liquidacion['detallesCreditosAntiguos'] ?? '[]')),
       );
 
       // 6. Guardar y compartir
