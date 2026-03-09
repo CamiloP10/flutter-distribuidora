@@ -569,4 +569,11 @@ class DBHelper {
       print('Error durante la limpieza automática: $e');
     }
   }
+// para el detalle de todos los cargues
+  static Future<List<DetalleFactura>> obtenerTodosLosDetalles() async {
+    // Usamos initDb() que es el método que ya tienes en tu archivo
+    final db = await DBHelper.initDb();
+    final List<Map<String, dynamic>> maps = await db.query('detalle_factura'); // Verifica si es 'detalle_factura' o 'detalles_factura'
+    return List.generate(maps.length, (i) => DetalleFactura.fromMap(maps[i]));
+  }
 }

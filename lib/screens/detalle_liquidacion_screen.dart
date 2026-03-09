@@ -13,9 +13,11 @@ import 'detalle_cargue_screen.dart';
 
 import 'package:provider/provider.dart'; // Soluciona: Undefined name 'Provider'
 import '../providers/ventas_provider.dart'; // Soluciona: The name 'VentasProvider' isn't a type
-import '../models/factura.dart'; // Soluciona: The name 'Factura' isn't a type
 
 import '../providers/cliente_provider.dart';
+
+import '../providers/cierre_dia_provider.dart';
+import '../providers/producto_provider.dart';
 
 class DetalleLiquidacionScreen extends StatelessWidget {
   final Map<String, dynamic> liquidacion;
@@ -114,6 +116,9 @@ class DetalleLiquidacionScreen extends StatelessWidget {
                 color: diferencia >= 0 ? Colors.green : Colors.red,
               ),
             ]),
+
+            // VISTA productos ---
+            _buildVistaPreviaProductos(context, liquidacion['id'], f),
 
             const SizedBox(height: 20),
             const Text('Cargues Vinculados', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
@@ -256,25 +261,105 @@ class DetalleLiquidacionScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildVistaPreviaProductos(BuildContext context, int idLiquidacion, NumberFormat f) {
+    return FutureBuilder<Map<String, Map<String, dynamic>>>(
+      future: _reconstruirResumenDesdeHistorial(context, idLiquidacion),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const LinearProgressIndicator(); // Una barra discreta mientras carga
+        }
+
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        final resumen = snapshot.data!;
+
+        return Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          child: ExpansionTile(
+            shape: const Border(), // Quita los bordes extra al expandir
+            leading: const Icon(Icons.inventory_2, color: Colors.blueGrey),
+            title: const Text(
+              'Resumen de Mercancía Vendida',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text('Ver desglose por categorías'),
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
+                  children: resumen.entries.map((categoria) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Encabezado de Categoría
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                          color: Colors.blueGrey.withOpacity(0.1),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(categoria.key,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                              Text(f.format(categoria.value['totalCat']),
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                            ],
+                          ),
+                        ),
+                        // Lista de productos
+                        ...(categoria.value['productos'] as Map<String, Map<String, double>>).entries.map((prod) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            child: Row(
+                              children: [
+                                Expanded(child: Text(prod.key, style: const TextStyle(fontSize: 12))),
+                                Text('${prod.value['cantidad']?.toInt()} und',
+                                    style: const TextStyle(color: Colors.blueGrey, fontSize: 12)),
+                                const SizedBox(width: 15),
+                                Text(f.format(prod.value['subtotal']),
+                                    style: const TextStyle(fontSize: 12)),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                        const Divider(),
+                      ],
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _generarCompartirPDF(BuildContext context) async {
     try {
       final DateTime fechaOriginal = DateTime.parse(liquidacion['fecha']);
       final int idLiquidacion = liquidacion['id'];
 
-      // 1. Obtener los cargues vinculados
-      final List<Map<String, dynamic>> carguesMap =
-      await DBHelper.obtenerCarguesPorLiquidacion(idLiquidacion);
+      // 1. Obtener Providers
+      final ventasProv = Provider.of<VentasProvider>(context, listen: false);
+      final cierreProv = Provider.of<CierreDiaProvider>(context, listen: false);
+      final productProv = Provider.of<ProductoProvider>(context, listen: false);
+      final clienteProv = Provider.of<ClienteProvider>(context, listen: false);
 
-      // 2. Recolectar todos los IDs de facturas para buscarlas en la DB
+      // 2. Obtener los cargues vinculados desde la DB
+      final List<Map<String, dynamic>> carguesMap = await DBHelper.obtenerCarguesPorLiquidacion(idLiquidacion);
+
       List<int> todosLosIdsFacturas = [];
-
       List<Cargue> carguesList = carguesMap.map((map) {
-        List<int> ids = [];
-        if (map['idsDeFacturas'] != null && map['idsDeFacturas'].toString().isNotEmpty) {
-          ids = map['idsDeFacturas'].toString().split(',').map((e) => int.parse(e)).toList();
-          todosLosIdsFacturas.addAll(ids); // Agregamos a la lista global de búsqueda
-        }
-
+        List<int> ids = (map['idsDeFacturas'] ?? "").toString()
+            .split(',')
+            .where((e) => e.isNotEmpty)
+            .map((e) => int.parse(e))
+            .toList();
+        todosLosIdsFacturas.addAll(ids);
         return Cargue(
           id: map['id'],
           vehiculoAsignado: map['vehiculo'] ?? '',
@@ -285,16 +370,20 @@ class DetalleLiquidacionScreen extends StatelessWidget {
         );
       }).toList();
 
-      // 3. BUSCAR LAS FACTURAS REALES (Esto quita los ceros en los cargues del PDF)
-      // Usamos el provider para obtener todas y filtramos, o una consulta al DBHelper
-      final ventasProvider = Provider.of<VentasProvider>(context, listen: false);
-      List<Factura> facturasParaPDF = ventasProvider.facturas
-          .where((f) => todosLosIdsFacturas.contains(f.id))
-          .toList();
+      // 3. Obtener facturas y detalles para reconstruir el resumen
+      final facturasParaPDF = ventasProv.facturas.where((f) => todosLosIdsFacturas.contains(f.id)).toList();
+      final todosLosDetalles = await DBHelper.obtenerTodosLosDetalles();
 
+      // RECONSTRUCCIÓN DEL RESUMEN (Igual que en la liquidación activa)
+      final resumenVentasFinal = cierreProv.procesarAgrupacion(
+          facturasParaPDF,
+          todosLosDetalles,
+          productProv.productos
+      );
+
+      // 4. Preparar desglose de billetes
       final desglose = jsonDecode(liquidacion['desgloseBilletes'] ?? '{}');
       final Map<String, int> cantidadesMap = Map<String, int>.from(desglose['billetes'] ?? {});
-
       final Map<String, double> subtotalesCalculados = {
         '100k': (cantidadesMap['100k'] ?? 0) * 100000.0,
         '50k': (cantidadesMap['50k'] ?? 0) * 50000.0,
@@ -304,14 +393,10 @@ class DetalleLiquidacionScreen extends StatelessWidget {
         '2k': (cantidadesMap['2k'] ?? 0) * 2000.0,
       };
 
-      // NUEVO: Obtener los clientes para poder ver los nombres en el PDF
-      final clientesProvider = Provider.of<ClienteProvider>(context, listen: false);
-      final listaClientes = clientesProvider.clientes;
-
-      // 4. Generar el PDF pasando ID, FECHA y FACTURAS
+      // 5. LLAMADA CORREGIDA AL PDF (Sin los parámetros viejos)
       final pdfBytes = await PdfGenerator.generarLiquidacionPDF(
-        liquidacionId: idLiquidacion,    // <-- Nuevo parámetro
-        fechaManual: fechaOriginal,     // <-- Nuevo parámetro
+        liquidacionId: idLiquidacion,
+        fechaManual: fechaOriginal,
         totalVendido: (liquidacion['totalFinal'] as num).toDouble(),
         totalDevoluciones: (liquidacion['totalDevoluciones'] as num).toDouble(),
         totalCreditos: (liquidacion['totalCreditosNuevos'] as num).toDouble(),
@@ -322,11 +407,12 @@ class DetalleLiquidacionScreen extends StatelessWidget {
         subtotales: subtotalesCalculados,
         monedas: (desglose['total_monedas'] as num).toDouble(),
         carguesLiquidados: carguesList,
-        todasLasFacturas: facturasParaPDF, // <-- YA NO ESTÁ VACÍO
-        todosLosClientes: listaClientes,
+        todosLosClientes: clienteProv.clientes,
+        resumenVentas: resumenVentasFinal,    // <-- NUEVO
+        facturasDelCargue: facturasParaPDF,   // <-- NUEVO
       );
 
-      // 5. Guardar y compartir
+      // 6. Guardar y compartir
       final String nombreArchivo = "Liquidacion_$idLiquidacion.pdf";
       final directory = await getTemporaryDirectory();
       final file = File('${directory.path}/$nombreArchivo');
@@ -342,5 +428,35 @@ class DetalleLiquidacionScreen extends StatelessWidget {
         SnackBar(content: Text('Error al generar PDF: $e')),
       );
     }
+  }
+
+  Future<Map<String, Map<String, dynamic>>> _reconstruirResumenDesdeHistorial(BuildContext context, int idLiquidacion) async {
+    // 1. Obtener IDs de facturas vinculadas
+    final carguesMap = await DBHelper.obtenerCarguesPorLiquidacion(idLiquidacion);
+    List<int> idsFacturas = [];
+    for (var c in carguesMap) {
+      if (c['idsDeFacturas'] != null) {
+        idsFacturas.addAll(c['idsDeFacturas'].toString()
+            .split(',')
+            .where((e) => e.isNotEmpty)
+            .map(int.parse));
+      }
+    }
+
+    // 2. Obtener datos necesarios de los Providers
+    final ventasProv = Provider.of<VentasProvider>(context, listen: false);
+    final productProv = Provider.of<ProductoProvider>(context, listen: false);
+    final cierreProv = Provider.of<CierreDiaProvider>(context, listen: false);
+
+    // 3. Obtener detalles de la DB (necesarios para el desglose)
+    final todosLosDetalles = await DBHelper.obtenerTodosLosDetalles();
+    final facturasFiltradas = ventasProv.facturas.where((f) => idsFacturas.contains(f.id)).toList();
+
+    // 4. Procesar con la lógica centralizada
+    return cierreProv.procesarAgrupacion(
+        facturasFiltradas,
+        todosLosDetalles,
+        productProv.productos
+    );
   }
 }

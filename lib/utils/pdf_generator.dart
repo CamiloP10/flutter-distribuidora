@@ -111,25 +111,18 @@ class PdfGenerator {
     final formatFecha = DateFormat('yyyy-MM-dd HH:mm');
     final formatMiles = NumberFormat('#,###', 'es_CO');
 
-    // 1. Filtrar solo las facturas seleccionadas en el cargue
     final facturasCargue = facturas
         .where((f) => cargue.facturaIds.contains(f.id))
         .toList();
 
-    // 2. Calcular total general del cargue
-    final totalCargue = facturasCargue.fold<double>(
-      0,
-          (sum, f) => sum + f.total,
-    );
+    final totalCargue = facturasCargue.fold<double>(0, (sum, f) => sum + f.total);
     final totalCredito = facturasCargue.fold<double>(0, (sum, f) => sum + f.saldoPendiente);
     final totalPagado = facturasCargue.fold<double>(0, (sum, f) => sum + f.pagado);
 
-    // 3. Filtrar detalles solo de esas facturas
     final detallesFiltrados = detalles
         .where((d) => cargue.facturaIds.contains(d.facturaId))
         .toList();
 
-    // 4. Agrupar productos por productoId
     final Map<int, double> cantidadPorProducto = {};
     for (final d in detallesFiltrados) {
       cantidadPorProducto[d.productoId] =
@@ -141,45 +134,51 @@ class PdfGenerator {
         pageFormat: PdfPageFormat(58 * PdfPageFormat.mm, PdfPageFormat.a4.height),
         margin: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 10),
         build: (context) => [
+          // 1. ENCABEZADO CON ID DE CARGUE (Aumentado a 14)
           pw.Center(
             child: pw.Text(
-              'CARGUE DE PEDIDOS',
-              style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+              'CARGUE DE PEDIDOS #${cargue.id ?? ""}', // <-- CAMBIO AQUÍ
+              style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
             ),
           ),
           pw.SizedBox(height: 6),
-          pw.Text('Vehículo: ${cargue.vehiculoAsignado}', style: const pw.TextStyle(fontSize: 9)),
-          pw.Text('Conductor: ${cargue.conductor}', style: const pw.TextStyle(fontSize: 9)),
-          pw.Text('Fecha: ${formatFecha.format(cargue.fecha)}', style: const pw.TextStyle(fontSize: 9)),
+          pw.Text('Vehículo: ${cargue.vehiculoAsignado}', style: const pw.TextStyle(fontSize: 10)),
+          pw.Text('Conductor: ${cargue.conductor}', style: const pw.TextStyle(fontSize: 10)),
+          pw.Text('Fecha: ${formatFecha.format(cargue.fecha)}', style: const pw.TextStyle(fontSize: 10)),
           if (cargue.observaciones.isNotEmpty)
-            pw.Text('Obs: ${cargue.observaciones}', style: const pw.TextStyle(fontSize: 9)),
-          pw.Text('Facturas asignadas:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
-          pw.Divider(),
+            pw.Text('Obs: ${cargue.observaciones}', style: const pw.TextStyle(fontSize: 10)),
+
+          pw.SizedBox(height: 8),
+          pw.Text('Facturas asignadas:', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
+          pw.Divider(thickness: 1),
+
           ...facturasCargue.map((f) {
             final clienteNombre = clientes[f.clienteId ?? 0]?.nombre ?? 'NR';
             return pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Text('factura #${f.id} -$clienteNombre', style: const pw.TextStyle(fontSize: 8)),
-                pw.Text('Total: \$${formatMiles.format(f.total)}      Efectivo.[  ]', style: const pw.TextStyle(fontSize: 8)),
-                pw.Text('Otro:__________________________', style: const pw.TextStyle(fontSize: 8)),
-                pw.Divider(thickness: 0.5),
-                //pw.SizedBox(height: 4),
+                pw.Text('Factura #${f.id} - $clienteNombre', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                pw.Text('Total: \$${formatMiles.format(f.total)}   Efectivo.[  ]', style: const pw.TextStyle(fontSize: 10)),
+                pw.Text('Obs:__________________________', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700)),
+                pw.Divider(thickness: 0.5, color: PdfColors.grey400),
               ],
             );
           }),
 
+          // TOTALES DEL CARGUE
+          pw.SizedBox(height: 5),
           pw.Text('Total cargue: \$${formatMiles.format(totalCargue)}',
-              style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
           pw.Text('Total efectivo: \$${formatMiles.format(totalPagado)}',
-              style: pw.TextStyle(fontSize: 9)),
+              style: pw.TextStyle(fontSize: 10)),
           pw.Text('Total crédito: \$${formatMiles.format(totalCredito)}',
-              style: pw.TextStyle(fontSize: 9)),
+              style: pw.TextStyle(fontSize: 10)),
 
-          pw.Divider(),
+          pw.Divider(thickness: 1.5),
 
-          pw.Text('Resumen de productos:',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
+          // RESUMEN DE PRODUCTOS (Aumentado para que el despachador vea bien)
+          pw.Text('RESUMEN DE PRODUCTOS:',
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 11)),
           ...cantidadPorProducto.entries.map((entry) {
             final producto = productos.firstWhere(
                     (p) => p.id == entry.key,
@@ -187,35 +186,26 @@ class PdfGenerator {
                     id: 0, codigo: '', nombre: 'Producto desconocido',
                     presentacion: '', cantidad: 0, precio: 0));
 
-            final nombre = producto.presentacion.isNotEmpty
-                ? producto.presentacion
-                : producto.nombre;
-
+            final nombre = producto.presentacion.isNotEmpty ? producto.presentacion : producto.nombre;
             final cantidad = formatearNumero(entry.value);
 
             return pw.Padding(
-              padding: const pw.EdgeInsets.symmetric(vertical: 4),
+              padding: const pw.EdgeInsets.symmetric(vertical: 3),
               child: pw.Row(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  pw.Text('[  ]', style: const pw.TextStyle(fontSize: 10)),
-                  pw.SizedBox(width: 4), // Espacio entre el cuadro y el texto
+                  pw.Text('[  ]', style: const pw.TextStyle(fontSize: 11)),
+                  pw.SizedBox(width: 6),
                   pw.Expanded(
                     child: pw.RichText(
                       text: pw.TextSpan(
                         children: [
                           pw.TextSpan(
                             text: '(x$cantidad) ',
-                            style: pw.TextStyle(
-                              fontSize: 10,
-                              fontWeight: pw.FontWeight.bold,
-                            ),
+                            style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
                           ),
                           pw.TextSpan(
                             text: nombre,
-                            style: pw.TextStyle(
-                              fontSize: 9,
-                              fontWeight: pw.FontWeight.normal,),
+                            style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.normal),
                           ),
                         ],
                       ),
@@ -226,10 +216,10 @@ class PdfGenerator {
             );
           }),
 
-          pw.Divider(),
+          pw.Divider(thickness: 1),
           pw.Center(
             child: pw.Text('FIN DEL CARGUE',
-                style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+                style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
           ),
         ],
       ),
@@ -310,6 +300,8 @@ class PdfGenerator {
   }
 
   // para las liquidaciones de cargues
+  // lib/services/pdf_generator.dart
+
   static Future<Uint8List> generarLiquidacionPDF({
     int? liquidacionId,
     DateTime? fechaManual,
@@ -323,8 +315,11 @@ class PdfGenerator {
     required Map<String, double> subtotales,
     required double monedas,
     required List<Cargue> carguesLiquidados,
-    required List<Factura> todasLasFacturas,
     required List<Cliente> todosLosClientes,
+    // 1. NUEVO PARÁMETRO: Recibe el trabajo ya hecho por el Provider
+    required Map<String, Map<String, dynamic>> resumenVentas,
+    // 2. RECIBE TAMBIÉN LAS FACTURAS FILTRADAS (Solo para la lista de Facturas al final)
+    required List<Factura> facturasDelCargue,
   }) async {
     final pdf = pw.Document();
     final formatMiles = NumberFormat('#,###', 'es_CO');
@@ -332,6 +327,10 @@ class PdfGenerator {
 
     final String fechaTexto = formatFecha.format(fechaManual ?? DateTime.now());
     final String tituloId = liquidacionId != null ? ' #$liquidacionId' : '';
+
+    // --- YA NO NECESITAMOS LOS BUCLES FOR AQUÍ ---
+    // Toda la lógica de agrupar ventasPorCategoria se eliminó
+    // porque ya viene en el parámetro 'resumenVentas'.
 
     final Map<String, String> etiquetas = {
       '100k': '\$100.000', '50k': '\$50.000', '20k': '\$20.000',
@@ -352,10 +351,8 @@ class PdfGenerator {
         build: (context) => [
           // 1. ENCABEZADO
           pw.Center(
-            child: pw.Text(
-              'LIQUIDACIÓN DE CAJA$tituloId',
-              style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
-            ),
+            child: pw.Text('LIQUIDACIÓN DE CAJA$tituloId',
+                style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
           ),
           pw.SizedBox(height: 4),
           pw.Text('Fecha: $fechaTexto', style: const pw.TextStyle(fontSize: 8)),
@@ -369,13 +366,12 @@ class PdfGenerator {
           _filaPdf('Recaudos:', totalRecaudoCreditos, formatMiles),
           pw.Divider(thickness: 0.5),
 
-          // 3. BALANCE FINAL
           _filaPdf('Efect. Esperado:', efectivoEsperado, formatMiles, bold: true),
           _filaPdf('Efect. Recibido:', totalRecibido, formatMiles, bold: true),
           _filaPdf(labelDiferencia, diferencia, formatMiles, bold: true),
           pw.Divider(),
 
-          // 4. ARQUEO DE BILLETES
+          // 3. ARQUEO DE BILLETES
           pw.Text('ARQUEO DE CAJA', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
           ...etiquetas.keys.map((key) {
             final cant = cantidades[key] ?? 0;
@@ -386,74 +382,77 @@ class PdfGenerator {
           if (monedas > 0) _filaPdf('Monedas:', monedas, formatMiles, small: true),
           pw.Divider(),
 
-          // 5. CARGUES LIQUIDADOS (Versión Final con Nombres de Clientes)
-          pw.Text('CARGUES VINCULADOS', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
-          pw.SizedBox(height: 4),
-          ...carguesLiquidados.map((cargue) {
-            final facturasDeEsteCargue = todasLasFacturas
-                .where((f) => cargue.facturaIds.contains(f.id))
-                .toList();
+          // 4. NUEVA SECCIÓN: RESUMEN DE VENTAS (Por Categoría/Producto)
+          pw.Center(
+            child: pw.Text('RESUMEN DE PRODUCTOS',
+                style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+          ),
+          pw.SizedBox(height: 5),
 
-            final double totalDelCargue = facturasDeEsteCargue.fold(0.0, (sum, f) => sum + (f.total ?? 0));
+          ...resumenVentas.entries.map((catEntry) {
+            final String nombreCat = catEntry.key;
+            final double totalCat = catEntry.value['totalCat'];
+            final Map<String, Map<String, double>> productos = catEntry.value['productos'];
 
             return pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
                 pw.Container(
-                  color: PdfColors.grey200,
                   padding: const pw.EdgeInsets.all(2),
+                  color: PdfColors.grey300,
                   child: pw.Row(
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
-                      pw.Expanded(
-                        child: pw.Text('#${cargue.id} - ${cargue.vehiculoAsignado}',
-                            style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
-                      ),
-                      pw.Text('\$${formatMiles.format(totalDelCargue)}',
+                      pw.Text(nombreCat, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+                      pw.Text('\$${formatMiles.format(totalCat)}',
                           style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
                     ],
                   ),
                 ),
-                pw.Text('Conductor: ${cargue.conductor}', style: const pw.TextStyle(fontSize: 8.5)),
-                pw.SizedBox(height: 2),
-
-                ...facturasDeEsteCargue.map((f) {
-                  // LÓGICA DE BÚSQUEDA DEL CLIENTE
-                  final clienteEncontrado = todosLosClientes.firstWhere(
-                        (c) => c.id == f.clienteId,
-                    orElse: () => Cliente(nombre: 'Cliente #${f.clienteId}', telefono: '', informacion: ''),
-                  );
-
+                ...productos.entries.map((prodEntry) {
                   return pw.Padding(
-                    padding: const pw.EdgeInsets.only(left: 4, top: 2),
-                    child: pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    padding: const pw.EdgeInsets.only(left: 4, right: 2, top: 2),
+                    child: pw.Row(
+                      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                       children: [
-                        pw.Row(
-                          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                          children: [
-                            pw.Expanded(
-                              child: pw.Text(
-                                // Aquí usamos clienteEncontrado.nombre que viene de tu modelo Cliente
-                                'Fact ${f.id}: ${clienteEncontrado.nombre}',
-                                style: const pw.TextStyle(fontSize: 8),
-                              ),
-                            ),
-                            pw.Text('\$${formatMiles.format(f.total)}',
-                                style: const pw.TextStyle(fontSize: 8)),
-                          ],
-                        ),
-                        pw.Padding(
-                          padding: const pw.EdgeInsets.only(bottom: 2),
-                          child: pw.Text('Obs: _________________________________',
-                              style: pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+                        pw.Expanded(child: pw.Text(prodEntry.key, style: const pw.TextStyle(fontSize: 8.5))),
+                        pw.Text(
+                          'x${prodEntry.value['cantidad']!.toInt()}  \$${formatMiles.format(prodEntry.value['subtotal']!)}',
+                          style: const pw.TextStyle(fontSize: 8.5),
                         ),
                       ],
                     ),
                   );
                 }).toList(),
+                pw.SizedBox(height: 4),
+              ],
+            );
+          }).toList(),
 
-                pw.Divider(thickness: 0.3, height: 10, color: PdfColors.grey400),
+          pw.Divider(thickness: 1),
+
+          // 5. CARGUES LIQUIDADOS (Lista de facturas para control)
+          pw.Text('DETALLE DE FACTURAS', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9)),
+          ...carguesLiquidados.map((cargue) {
+            // Filtramos las facturas que pertenecen a este cargue específico
+            final facturasEsteCargue = facturasDelCargue.where((f) => cargue.facturaIds.contains(f.id)).toList();
+
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text('Cargue #${cargue.id} - ${cargue.conductor}', style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold)),
+                ...facturasEsteCargue.map((f) {
+                  final cliente = todosLosClientes.firstWhere((c) => c.id == f.clienteId,
+                      orElse: () => Cliente(nombre: 'Desconocido', telefono: '', informacion: ''));
+                  return pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text('Fact ${f.id}: ${cliente.nombre}', style: const pw.TextStyle(fontSize: 7.5)),
+                      pw.Text('\$${formatMiles.format(f.total)}', style: const pw.TextStyle(fontSize: 7.5)),
+                    ],
+                  );
+                }).toList(),
+                pw.Divider(thickness: 0.2),
               ],
             );
           }).toList(),

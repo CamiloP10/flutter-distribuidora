@@ -13,6 +13,9 @@ import 'dart:convert';
 import 'package:inv/db/db_helper.dart';
 import '../providers/cliente_provider.dart';
 
+import '../providers/cierre_dia_provider.dart';
+import '../providers/producto_provider.dart';
+
 class ThousandsInputFormatter extends TextInputFormatter {
   final NumberFormat _formatter = NumberFormat('#,##0', 'es_CO');
   @override
@@ -246,7 +249,25 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
                         setModalState(() => _isConfirming = true);
 
                         try {
-                          // 1. Preparar los datos para la base de datos
+                          final cierreProv = Provider.of<CierreDiaProvider>(context, listen: false);
+                          final productoProv = Provider.of<ProductoProvider>(context, listen: false);
+                          final clienteProv = Provider.of<ClienteProvider>(context, listen: false);
+
+                          // 1. Obtener datos maestros (Detalles de DB y Productos de Provider)
+                          final todosLosDetalles = await DBHelper.obtenerTodosLosDetalles();
+                          final todosLosProductos = productoProv.productos;
+
+                          // 2. Filtrar y Agrupar (Usando la lógica centralizada del Provider)
+                          final facturasIdsEnCargues = carguesLiquidados.expand((c) => c.facturaIds).toSet();
+                          final facturasDelCargue = todasLasFacturas.where((f) => facturasIdsEnCargues.contains(f.id)).toList();
+
+                          final resumenVentasFinal = cierreProv.procesarAgrupacion(
+                              facturasDelCargue,
+                              todosLosDetalles,
+                              todosLosProductos
+                          );
+
+                          // 3. Preparar datos para persistencia en SQLite
                           final datosLiquidacion = {
                             'fecha': DateTime.now().toIso8601String(),
                             'totalEfectivo': totalRecibido,
@@ -264,18 +285,15 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
 
                           final idsCargues = carguesLiquidados.map((c) => c.id).toList();
 
-                          // 2. Guardar en SQLite
+                          // 4. Guardar liquidación y obtener el ID generado
                           final int nuevoIdLiquidacion = await DBHelper.insertarLiquidacionCompleta(datosLiquidacion, idsCargues);
 
-                          // --- [CAMBIO AQUÍ] OBTENER CLIENTES PARA EL PDF ---
-                          final clienteProvider = Provider.of<ClienteProvider>(context, listen: false);
-                          // Por seguridad, si la lista está vacía, cargamos desde DB
-                          if (clienteProvider.clientes.isEmpty) {
-                            await clienteProvider.cargarClientes();
+                          // 5. Asegurar que los clientes estén cargados para el PDF
+                          if (clienteProv.clientes.isEmpty) {
+                            await clienteProv.cargarClientes();
                           }
-                          // ------------------------------------------------
 
-                          // 3. Generar el PDF (Ahora con todos los parámetros)
+                          // 6. Generar el PDF con el resumen ya procesado
                           final pdfBytes = await PdfGenerator.generarLiquidacionPDF(
                             liquidacionId: nuevoIdLiquidacion,
                             totalVendido: totalVendido,
@@ -288,12 +306,13 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
                             subtotales: subtotales,
                             monedas: tMonedas,
                             carguesLiquidados: carguesLiquidados,
-                            todasLasFacturas: todasLasFacturas,
-                            todosLosClientes: clienteProvider.clientes, // <--- NUEVO PARÁMETRO
+                            todosLosClientes: clienteProv.clientes,
+                            resumenVentas: resumenVentasFinal,    // Mapa procesado por el Provider
+                            facturasDelCargue: facturasDelCargue, // Lista filtrada para el detalle final
                           );
 
+                          // 7. Guardar temporalmente y compartir
                           final dir = await getTemporaryDirectory();
-                          // En lugar de usar DateTime.now().millisecondsSinceEpoch
                           final String nombreArchivo = "Liquidacion_Caja_$nuevoIdLiquidacion.pdf";
                           final file = File('${dir.path}/$nombreArchivo');
                           await file.writeAsBytes(pdfBytes);
@@ -313,7 +332,7 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
                           }
 
                         } catch (e) {
-                          debugPrint("Error en liquidación: $e"); // Ayuda a debugear
+                          debugPrint("Error en liquidación: $e");
                           if (modalContext.mounted) {
                             ScaffoldMessenger.of(modalContext).showSnackBar(
                               SnackBar(content: Text('Error en el proceso: $e')),
