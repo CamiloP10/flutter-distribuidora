@@ -75,7 +75,7 @@ class CierreDiaProvider extends ChangeNotifier {
 
     // --- NUEVO: CARGAR DETALLES Y PRODUCTOS PARA EL RESUMEN ---
     final todosLosProductos = await DBHelper.obtenerProductos();
-    final todosLosDetalles = await DBHelper.obtenerTodosLosDetalles(); // Asegúrate de tener este método en DBHelper
+    final List<DetalleFactura> todosLosDetalles = await DBHelper.obtenerTodosLosDetalles();
 
     // Calculamos el resumen global del día
     resumenVentasGlobal = procesarAgrupacion(facturasDelDia, todosLosDetalles, todosLosProductos);
