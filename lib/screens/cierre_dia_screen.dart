@@ -181,8 +181,8 @@ class _CierreDiaScreenState extends State<CierreDiaScreen> {
   }
 
   Widget _buildResumenMercancia(CierreDiaProvider provider, ProductoProvider productProv, NumberFormat f) {
-    // Usamos el método procesarAgrupacion del provider
-    final resumen = provider.procesarAgrupacion(provider.facturasDelDia, [], productProv.productos);
+    // CAMBIO: Usamos el mapa que ya procesó el provider internamente
+    final resumen = provider.resumenVentasGlobal;
 
     return Card(
       elevation: 2,
@@ -191,7 +191,7 @@ class _CierreDiaScreenState extends State<CierreDiaScreen> {
         leading: const Icon(Icons.inventory_2, color: Colors.blueGrey),
         title: const Text('Resumen de Mercancía', style: TextStyle(fontWeight: FontWeight.bold)),
         children: resumen.isEmpty
-            ? [const ListTile(title: Text('Sin ventas en esta fecha'))]
+            ? [const ListTile(title: Text('No hay productos registrados hoy'))]
             : resumen.entries.map((cat) => _buildCategoriaItem(cat, f)).toList(),
       ),
     );

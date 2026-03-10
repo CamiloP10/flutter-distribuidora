@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 class CalculadoraEfectivoScreen extends StatefulWidget {
@@ -9,14 +10,18 @@ class CalculadoraEfectivoScreen extends StatefulWidget {
 }
 
 class _CalculadoraEfectivoScreenState extends State<CalculadoraEfectivoScreen> {
-  // Mapa para las cantidades de billetes
-  final Map<String, int> _cantidades = {
-    '100k': 0, '50k': 0, '20k': 0, '10k': 0, '5k': 0, '2k': 0,
+  final Map<String, double> _valores = {
+    '100.000': 100000, '50.000': 50000, '20.000': 20000,
+    '10.000': 10000, '5.000': 5000, '2.000': 2000,
   };
 
-  // Valores numéricos para el cálculo
-  final Map<String, double> _valores = {
-    '100k': 100000, '50k': 50000, '20k': 20000, '10k': 10000, '5k': 5000, '2k': 2000,
+  final Map<String, TextEditingController> _controllers = {
+    '100.000': TextEditingController(),
+    '50.000': TextEditingController(),
+    '20.000': TextEditingController(),
+    '10.000': TextEditingController(),
+    '5.000': TextEditingController(),
+    '2.000': TextEditingController(),
   };
 
   final TextEditingController _monedasController = TextEditingController();
@@ -24,25 +29,40 @@ class _CalculadoraEfectivoScreenState extends State<CalculadoraEfectivoScreen> {
 
   double get _totalBilletes {
     double total = 0;
-    _cantidades.forEach((key, cant) {
+    _controllers.forEach((key, controller) {
+      double cant = double.tryParse(controller.text) ?? 0;
       total += cant * (_valores[key] ?? 0);
     });
     return total;
   }
 
   double get _totalFinal {
-    double monedas = double.tryParse(_monedasController.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+    String textoLimpio = _monedasController.text.replaceAll(RegExp(r'[^0-9]'), '');
+    double monedas = double.tryParse(textoLimpio) ?? 0;
     return _totalBilletes + monedas;
   }
 
   void _limpiarTodo() {
     setState(() {
-      _cantidades.updateAll((key, value) => 0);
+      for (var controller in _controllers.values) {
+        controller.clear();
+      }
       _monedasController.clear();
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Calculadora reiniciada'), duration: Duration(seconds: 1)),
+      const SnackBar(
+        content: Text('Calculadora reiniciada'),
+        duration: Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+      ),
     );
+  }
+
+  @override
+  void dispose() {
+    for (var c in _controllers.values) { c.dispose(); }
+    _monedasController.dispose();
+    super.dispose();
   }
 
   @override
@@ -51,54 +71,81 @@ class _CalculadoraEfectivoScreenState extends State<CalculadoraEfectivoScreen> {
       appBar: AppBar(
         title: const Text('Calculadora de Efectivo'),
         backgroundColor: Colors.black,
-        actions: [
-          IconButton(
-            onPressed: _limpiarTodo,
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Limpiar todo',
-          )
-        ],
+      ),
+      // --- BOTÓN FLOTANTE AZUL ---
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _limpiarTodo,
+        label: const Text('BORRAR TODO', style: TextStyle(fontWeight: FontWeight.bold)),
+        icon: const Icon(Icons.delete_sweep),
+        backgroundColor: Colors.blue.shade800,
+        foregroundColor: Colors.white,
       ),
       body: Column(
         children: [
-          // TOTAL FLOTANTE (Encabezado)
           Container(
             width: double.infinity,
             color: Colors.blueGrey.shade900,
-            padding: const EdgeInsets.symmetric(vertical: 20),
+            padding: const EdgeInsets.symmetric(vertical: 25),
             child: Column(
               children: [
-                const Text('TOTAL EN CAJA', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                const Text('TOTAL', style: TextStyle(color: Colors.white70, fontSize: 13, letterSpacing: 1.2)),
                 Text(f.format(_totalFinal),
-                    style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)),
+                    style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold)),
               ],
             ),
           ),
-
           Expanded(
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                const Text('Billetes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                const Row(
+                  children: [
+                    Icon(Icons.money, size: 20, color: Colors.blueGrey),
+                    SizedBox(width: 8),
+                    Text('Billetes', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  ],
+                ),
                 const Divider(),
-                ..._valores.keys.map((denominacion) => _buildFilaBillete(denominacion)),
-
-                const SizedBox(height: 20),
-                const Text('Otros', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                ..._valores.keys.map((denominacion) => _buildFilaInput(denominacion)),
+                const SizedBox(height: 25),
+                const Row(
+                  children: [
+                    Icon(Icons.savings_outlined, size: 20, color: Colors.blueGrey),
+                    SizedBox(width: 8),
+                    Text('Otros / Monedas', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  ],
+                ),
                 const Divider(),
-
-                // Campo de Monedas
-                ListTile(
-                  leading: const Icon(Icons.circle, color: Colors.amber),
-                  title: const Text('Total en Monedas'),
-                  subtitle: TextField(
-                    controller: _monedasController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(hintText: '0', prefixText: '\$ '),
-                    onChanged: (_) => setState(() {}),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      const Expanded(flex: 3, child: Text('Total ingresado', style: TextStyle(fontSize: 16))),
+                      Expanded(
+                        flex: 4,
+                        child: TextField(
+                          controller: _monedasController,
+                          keyboardType: TextInputType.number,
+                          textAlign: TextAlign.right,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            CurrencyInputFormatter(),
+                          ],
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.teal),
+                          decoration: const InputDecoration(
+                            hintText: '0',
+                            prefixText: '\$ ',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          onChanged: (_) => setState(() {}),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 100), // Espacio para no chocar con el teclado
+                // Espacio extra para que el FAB no tape el último campo
+                const SizedBox(height: 100),
               ],
             ),
           ),
@@ -107,44 +154,59 @@ class _CalculadoraEfectivoScreenState extends State<CalculadoraEfectivoScreen> {
     );
   }
 
-  Widget _buildFilaBillete(String label) {
+  Widget _buildFilaInput(String label) {
+    double subtotal = (double.tryParse(_controllers[label]!.text) ?? 0) * _valores[label]!;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
+          Expanded(flex: 2, child: Text(label, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500))),
           Expanded(
             flex: 2,
-            child: Text(label, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
+            child: TextField(
+              controller: _controllers[label],
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              decoration: InputDecoration(
+                hintText: '0',
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
           ),
-          // Botón menos
-          IconButton(
-            onPressed: () {
-              if (_cantidades[label]! > 0) {
-                setState(() => _cantidades[label] = _cantidades[label]! - 1);
-              }
-            },
-            icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
-          ),
-          // Cantidad
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade300), borderRadius: BorderRadius.circular(5)),
-            child: Text('${_cantidades[label]}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          ),
-          // Botón más
-          IconButton(
-            onPressed: () => setState(() => _cantidades[label] = _cantidades[label]! + 1),
-            icon: const Icon(Icons.add_circle_outline, color: Colors.green),
-          ),
-          // Subtotal por denominación
           Expanded(
             flex: 3,
-            child: Text(f.format(_cantidades[label]! * _valores[label]!),
-                textAlign: TextAlign.right,
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
+            child: Text(
+              f.format(subtotal),
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                color: subtotal > 0 ? Colors.blueGrey.shade800 : Colors.grey.shade400,
+                fontSize: 15,
+                fontWeight: subtotal > 0 ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class CurrencyInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.isEmpty) return newValue.copyWith(text: '');
+    String newText = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    final int value = int.parse(newText);
+    final formatter = NumberFormat('#,###', 'es_CO');
+    String newString = formatter.format(value).replaceAll(',', '.');
+    return TextEditingValue(
+      text: newString,
+      selection: TextSelection.collapsed(offset: newString.length),
     );
   }
 }
