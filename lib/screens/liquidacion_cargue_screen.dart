@@ -46,6 +46,7 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
   final Set<int> _carguesSeleccionados = {};
   final NumberFormat currencyFormat = NumberFormat('#,##0', 'es_CO');
   bool _isLoading = true;
+  int _limiteCargues = 10; // Empezamos con 10
 
   @override
   void initState() {
@@ -64,6 +65,102 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
     if (mounted) {
       setState(() => _isLoading = false);
     }
+  }
+
+  // 1. Añadimos los parámetros a la firma de la función
+  void _abrirSelectorCargues(
+      BuildContext context,
+      List<Cargue> carguesDisponibles,
+      List<Factura> todasLasFacturas
+      ) {
+    final f = NumberFormat.currency(symbol: '\$', decimalDigits: 0);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))
+      ),
+      builder: (context) {
+        // Usamos StatefulBuilder para que el "Ver más" funcione internamente
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            // 2. Filtramos los cargues que aún no han sido seleccionados
+            final disponibles = carguesDisponibles
+                .where((c) => !_carguesSeleccionados.contains(c.id))
+                .toList();
+
+            final visible = disponibles.take(_limiteCargues).toList();
+            final hayMas = disponibles.length > _limiteCargues;
+
+            return Container(
+              padding: const EdgeInsets.all(16),
+              height: MediaQuery.of(context).size.height * 0.8, // Un poco más alto para ver mejor
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Seleccionar Cargue para Liquidar',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Divider(),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: visible.length + (hayMas ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        if (index < visible.length) {
+                          final c = visible[index];
+
+                          // 3. Cálculo del total del cargue (Suma de sus facturas)
+                          final double totalCargue = todasLasFacturas
+                              .where((f) => c.facturaIds.contains(f.id))
+                              .fold(0.0, (sum, f) => sum + f.total);
+
+                          return ListTile(
+                            leading: const CircleAvatar(
+                              backgroundColor: Colors.blueGrey,
+                              child: Icon(Icons.inventory_2, color: Colors.white, size: 20),
+                            ),
+                            title: Text('Cargue #${c.id} - ${c.conductor}',
+                                style: const TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: Text(
+                              'Fecha: ${DateFormat('dd/MM/yyyy').format(c.fecha)}\n'
+                                  'Total: ${f.format(totalCargue)}  (${c.vehiculoAsignado})',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            isThreeLine: true,
+                            onTap: () {
+                              setState(() {
+                                _carguesSeleccionados.add(c.id);
+                              });
+                              Navigator.pop(context);
+                            },
+                          );
+                        } else {
+                          // BOTÓN VER MÁS
+                          return Center(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              child: TextButton.icon(
+                                onPressed: () {
+                                  setModalState(() {
+                                    _limiteCargues += 10;
+                                  });
+                                },
+                                icon: const Icon(Icons.add),
+                                label: const Text('Cargar 10 más...'),
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   double _calcularTotalVendido(
@@ -582,37 +679,28 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
         children: [
+          // NUEVO SELECTOR TIPO BUSCADOR
           Padding(
             padding: const EdgeInsets.all(12.0),
-            child: DropdownButtonFormField<int>(
-              key: UniqueKey(), // <-- ESTO ES CLAVE: Obliga a Flutter a refrescar el widget limpiamente
-              hint: const Text('Seleccione un cargue para añadir...'),
-              value: null, // Mantenerlo en null para que siempre muestre el hint
-              isExpanded: true,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.add),
+            child: InkWell(
+              onTap: () => _abrirSelectorCargues(context, carguesDisponibles, todasLasFacturas),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.add_circle_outline, color: Colors.blue),
+                    const SizedBox(width: 10),
+                    const Text('Toca para añadir un cargue...',
+                        style: TextStyle(fontSize: 16, color: Colors.black87)),
+                    const Spacer(),
+                    const Icon(Icons.arrow_drop_down),
+                  ],
+                ),
               ),
-              // Filtramos para que no aparezcan los que ya seleccionamos (opcional pero recomendado)
-              items: carguesDisponibles
-                  .where((c) => !_carguesSeleccionados.contains(c.id))
-                  .map((cargue) {
-                return DropdownMenuItem<int>(
-                  value: cargue.id,
-                  child: Text(
-                    '#${cargue.id} - ${cargue.conductor} (${cargue.vehiculoAsignado})',
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                );
-              }).toList(),
-              onChanged: (int? selectedId) {
-                if (selectedId != null) {
-                  setState(() {
-                    // Añadimos el ID a la lista de seleccionados
-                    _carguesSeleccionados.add(selectedId);
-                  });
-                }
-              },
             ),
           ),
 

@@ -15,7 +15,9 @@ class _CargueHistorialScreenState extends State<CargueHistorialScreen> {
   List<Cargue> _todosLosCargues = [];
   List<Cargue> _carguesFiltrados = [];
 
-  int _limite = 30;
+  // 1. CAMBIO DE LÍMITE A 15
+  int _limite = 15;
+  int _totalResultadosFiltrados = 0;
 
   String _filtroTexto = '';
   String _vehiculoSeleccionado = 'Todos';
@@ -42,6 +44,7 @@ class _CargueHistorialScreenState extends State<CargueHistorialScreen> {
 
   Future<void> cargarCargues() async {
     final lista = await DBHelper.obtenerCargues();
+    // Ordenar por fecha descendente (más recientes primero)
     lista.sort((a, b) => b.fecha.compareTo(a.fecha));
     setState(() {
       _todosLosCargues = lista;
@@ -52,6 +55,7 @@ class _CargueHistorialScreenState extends State<CargueHistorialScreen> {
   void _aplicarFiltro() {
     List<Cargue> resultado = [..._todosLosCargues];
 
+    // Filtro por texto
     if (_filtroTexto.isNotEmpty) {
       final texto = _filtroTexto.toLowerCase();
       resultado = resultado.where((c) {
@@ -60,19 +64,21 @@ class _CargueHistorialScreenState extends State<CargueHistorialScreen> {
       }).toList();
     }
 
+    // Filtro por vehículo
     if (_vehiculoSeleccionado != 'Todos') {
       resultado = resultado.where((c) => c.vehiculoAsignado == _vehiculoSeleccionado).toList();
     }
 
+    // Filtro por rango de fechas
     if (_fechaInicio != null) {
       resultado = resultado.where((c) => c.fecha.isAfter(_fechaInicio!.subtract(const Duration(days: 1)))).toList();
     }
-
     if (_fechaFin != null) {
       resultado = resultado.where((c) => c.fecha.isBefore(_fechaFin!.add(const Duration(days: 1)))).toList();
     }
 
     setState(() {
+      _totalResultadosFiltrados = resultado.length;
       _carguesFiltrados = resultado.take(_limite).toList();
     });
   }
@@ -80,19 +86,16 @@ class _CargueHistorialScreenState extends State<CargueHistorialScreen> {
   void _seleccionarFecha(BuildContext context, bool esInicio) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: esInicio ? (_fechaInicio ?? DateTime.now()) : (_fechaFin ?? DateTime.now()),
+      initialDate: DateTime.now(),
       firstDate: DateTime(2020),
       lastDate: DateTime.now().add(const Duration(days: 1)),
     );
 
     if (picked != null) {
       setState(() {
-        if (esInicio) {
-          _fechaInicio = picked;
-        } else {
-          _fechaFin = picked;
-        }
-        _limite = 30;
+        if (esInicio) _fechaInicio = picked;
+        else _fechaFin = picked;
+        _limite = 15; // Reiniciar límite al filtrar
         _aplicarFiltro();
       });
     }
@@ -100,116 +103,123 @@ class _CargueHistorialScreenState extends State<CargueHistorialScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final hayMas = _carguesFiltrados.length <
-        _todosLosCargues.where((c) {
-          final texto = _filtroTexto.toLowerCase();
-          final coincideTexto = c.id.toString().contains(texto) || c.conductor.toLowerCase().contains(texto);
-          final coincideVehiculo = _vehiculoSeleccionado == 'Todos' || c.vehiculoAsignado == _vehiculoSeleccionado;
-          final coincideFechaInicio = _fechaInicio == null || c.fecha.isAfter(_fechaInicio!.subtract(const Duration(days: 1)));
-          final coincideFechaFin = _fechaFin == null || c.fecha.isBefore(_fechaFin!.add(const Duration(days: 1)));
-
-          return coincideTexto && coincideVehiculo && coincideFechaInicio && coincideFechaFin;
-        }).length;
+    // 2. Lógica simplificada para saber si hay más datos por cargar
+    final bool hayMas = _carguesFiltrados.length < _totalResultadosFiltrados;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Historial de Cargues')),
+      appBar: AppBar(
+        title: const Text('Historial de Cargues'),
+        backgroundColor: Colors.black,
+      ),
       body: Column(
         children: [
+          // Sección de Filtros
           Padding(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(12),
             child: Column(
               children: [
                 TextField(
                   controller: _busquedaController,
                   decoration: const InputDecoration(
-                    labelText: 'Buscar por #Cargue o Conductor',
+                    labelText: 'Buscar por # o Conductor',
                     prefixIcon: Icon(Icons.search),
                     border: OutlineInputBorder(),
+                    isDense: true,
                   ),
                   onChanged: (value) {
                     _filtroTexto = value.trim();
-                    _limite = 30;
+                    _limite = 15;
                     _aplicarFiltro();
                   },
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 Row(
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<String>(
                         value: _vehiculoSeleccionado,
-                        items: _vehiculos.map((v) => DropdownMenuItem(value: v, child: Text(v))).toList(),
+                        items: _vehiculos.map((v) => DropdownMenuItem(value: v, child: Text(v, style: const TextStyle(fontSize: 13)))).toList(),
                         onChanged: (val) {
                           setState(() {
                             _vehiculoSeleccionado = val!;
-                            _limite = 30;
+                            _limite = 15;
                             _aplicarFiltro();
                           });
                         },
                         decoration: const InputDecoration(
-                          labelText: 'Filtrar por Vehículo',
+                          labelText: 'Vehículo',
                           border: OutlineInputBorder(),
+                          isDense: true,
                         ),
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        children: [
-                          ElevatedButton.icon(
-                            onPressed: () => _seleccionarFecha(context, true),
-                            icon: const Icon(Icons.date_range),
-                            label: Text(_fechaInicio == null
-                                ? 'Desde'
-                                : DateFormat('dd/MM/yy').format(_fechaInicio!)),
-                          ),
-                          ElevatedButton.icon(
-                            onPressed: () => _seleccionarFecha(context, false),
-                            icon: const Icon(Icons.date_range),
-                            label: Text(_fechaFin == null
-                                ? 'Hasta'
-                                : DateFormat('dd/MM/yy').format(_fechaFin!)),
-                          ),
-                        ],
-                      ),
+                    // Botones de Fecha
+                    Column(
+                      children: [
+                        _botonFecha(true),
+                        const SizedBox(height: 4),
+                        _botonFecha(false),
+                      ],
                     ),
                   ],
                 ),
               ],
             ),
           ),
+
+          // Listado
           Expanded(
             child: _carguesFiltrados.isEmpty
-                ? const Center(child: Text("No hay cargues registrados"))
+                ? const Center(child: Text("No hay cargues que coincidan"))
                 : ListView.builder(
+              padding: const EdgeInsets.only(bottom: 20),
               itemCount: _carguesFiltrados.length + (hayMas ? 1 : 0),
               itemBuilder: (context, index) {
                 if (index < _carguesFiltrados.length) {
                   final cargue = _carguesFiltrados[index];
-                  return ListTile(
-                    title: Text("Cargue #${cargue.id} - ${cargue.vehiculoAsignado}"),
-                    subtitle: Text(
-                      "${DateFormat('dd/MM/yyyy HH:mm').format(cargue.fecha)} - ${cargue.conductor}",
+                  return Card(
+                    margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    child: ListTile(
+                      leading: const CircleAvatar(
+                        backgroundColor: Colors.blueGrey,
+                        child: Icon(Icons.local_shipping, color: Colors.white, size: 20),
+                      ),
+                      title: Text("Cargue #${cargue.id} - ${cargue.conductor}",
+                          style: const TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text(
+                        "${DateFormat('dd/MM/yyyy  HH:mm').format(cargue.fecha)}\nVehículo: ${cargue.vehiculoAsignado}",
+                      ),
+                      isThreeLine: true,
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => DetalleCargueScreen(cargue: cargue),
+                          ),
+                        );
+                      },
                     ),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => DetalleCargueScreen(cargue: cargue),
-                        ),
-                      );
-                    },
                   );
                 } else {
-                  return Center(
-                    child: TextButton(
-                      onPressed: () {
-                        setState(() {
-                          _limite += 30;
-                          _aplicarFiltro();
-                        });
-                      },
-                      child: const Text('Ver más'),
+                  // 3. BOTÓN VER MÁS
+                  return Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Center(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() {
+                            _limite += 15; // Cargar otros 15
+                            _aplicarFiltro();
+                          });
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blueGrey,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('Ver más cargues...'),
+                      ),
                     ),
                   );
                 }
@@ -217,6 +227,24 @@ class _CargueHistorialScreenState extends State<CargueHistorialScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _botonFecha(bool esInicio) {
+    final fecha = esInicio ? _fechaInicio : _fechaFin;
+    return SizedBox(
+      height: 35,
+      width: 120,
+      child: ElevatedButton(
+        onPressed: () => _seleccionarFecha(context, esInicio),
+        style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          textStyle: const TextStyle(fontSize: 11),
+        ),
+        child: Text(fecha == null
+            ? (esInicio ? 'Desde' : 'Hasta')
+            : DateFormat('dd/MM/yy').format(fecha)),
       ),
     );
   }
