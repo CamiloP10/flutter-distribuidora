@@ -9,6 +9,12 @@ import '../models/cargue.dart';
 import '../models/factura.dart';
 import '../providers/ventas_provider.dart';
 import '../utils/pdf_generator.dart';
+import 'dart:convert';
+import 'package:inv/db/db_helper.dart';
+import '../providers/cliente_provider.dart';
+
+import '../providers/cierre_dia_provider.dart';
+import '../providers/producto_provider.dart';
 
 class ThousandsInputFormatter extends TextInputFormatter {
   final NumberFormat _formatter = NumberFormat('#,##0', 'es_CO');
@@ -40,6 +46,7 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
   final Set<int> _carguesSeleccionados = {};
   final NumberFormat currencyFormat = NumberFormat('#,##0', 'es_CO');
   bool _isLoading = true;
+  int _limiteCargues = 10; // Empezamos con 10
 
   @override
   void initState() {
@@ -58,6 +65,102 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
     if (mounted) {
       setState(() => _isLoading = false);
     }
+  }
+
+  // 1. Añadimos los parámetros a la firma de la función
+  void _abrirSelectorCargues(
+      BuildContext context,
+      List<Cargue> carguesDisponibles,
+      List<Factura> todasLasFacturas
+      ) {
+    final f = NumberFormat.currency(symbol: '\$', decimalDigits: 0);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))
+      ),
+      builder: (context) {
+        // Usamos StatefulBuilder para que el "Ver más" funcione internamente
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            // 2. Filtramos los cargues que aún no han sido seleccionados
+            final disponibles = carguesDisponibles
+                .where((c) => !_carguesSeleccionados.contains(c.id))
+                .toList();
+
+            final visible = disponibles.take(_limiteCargues).toList();
+            final hayMas = disponibles.length > _limiteCargues;
+
+            return Container(
+              padding: const EdgeInsets.all(16),
+              height: MediaQuery.of(context).size.height * 0.8, // Un poco más alto para ver mejor
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Seleccionar Cargue para Liquidar',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Divider(),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: visible.length + (hayMas ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        if (index < visible.length) {
+                          final c = visible[index];
+
+                          // 3. Cálculo del total del cargue (Suma de sus facturas)
+                          final double totalCargue = todasLasFacturas
+                              .where((f) => c.facturaIds.contains(f.id))
+                              .fold(0.0, (sum, f) => sum + f.total);
+
+                          return ListTile(
+                            leading: const CircleAvatar(
+                              backgroundColor: Colors.blueGrey,
+                              child: Icon(Icons.inventory_2, color: Colors.white, size: 20),
+                            ),
+                            title: Text('Cargue #${c.id} - ${c.conductor}',
+                                style: const TextStyle(fontWeight: FontWeight.bold)),
+                            subtitle: Text(
+                              'Fecha: ${DateFormat('dd/MM/yyyy').format(c.fecha)}\n'
+                                  'Total: ${f.format(totalCargue)}  (${c.vehiculoAsignado})',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                            isThreeLine: true,
+                            onTap: () {
+                              setState(() {
+                                _carguesSeleccionados.add(c.id);
+                              });
+                              Navigator.pop(context);
+                            },
+                          );
+                        } else {
+                          // BOTÓN VER MÁS
+                          return Center(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              child: TextButton.icon(
+                                onPressed: () {
+                                  setModalState(() {
+                                    _limiteCargues += 10;
+                                  });
+                                },
+                                icon: const Icon(Icons.add),
+                                label: const Text('Cargar 10 más...'),
+                              ),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   double _calcularTotalVendido(
@@ -81,6 +184,105 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
     return totalVendido;
   }
 
+  void _abrirDialogoDetalle( //Diálogo de Captura (Función de Apoyo para los JSON)
+      BuildContext context,
+      String titulo,
+      List<Map<String, dynamic>> lista,
+      VoidCallback onActualizar) {
+
+    final nameCtrl = TextEditingController();
+    final montoCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Añadir a $titulo'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'Nombre / Concepto'),
+              textCapitalization: TextCapitalization.words,
+            ),
+            TextField(
+              controller: montoCtrl,
+              decoration: const InputDecoration(labelText: 'Monto (\$)'),
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly, ThousandsInputFormatter()],
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () {
+              if (nameCtrl.text.isNotEmpty && montoCtrl.text.isNotEmpty) {
+                final monto = double.tryParse(montoCtrl.text.replaceAll('.', '')) ?? 0;
+                lista.add({'nombre': nameCtrl.text, 'monto': monto});
+                onActualizar();
+                Navigator.pop(ctx);
+              }
+            },
+            child: const Text('Añadir'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Esta función crea el diseño de la lista que ves en pantalla
+  // Añadimos 'VoidCallback onRemove' al final de los parámetros
+  Widget _buildFilaDinamica(String label, List<Map<String, dynamic>> lista, Color color, VoidCallback onAdd, VoidCallback onRemove) {
+    double totalLista = lista.fold(0.0, (sum, item) => sum + item['monto']);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: color)),
+                const SizedBox(width: 8),
+                Text(currencyFormat.format(totalLista), style: TextStyle(color: color, fontSize: 13)),
+              ],
+            ),
+            IconButton(
+              icon: const Icon(Icons.add_circle, color: Colors.blue, size: 28),
+              onPressed: onAdd,
+            ),
+          ],
+        ),
+        if (lista.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(left: 12, bottom: 8),
+            child: Column(
+              children: lista.asMap().entries.map((entry) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    children: [
+                      Expanded(child: Text('• ${entry.value['nombre']}', style: const TextStyle(fontSize: 12))),
+                      Text(currencyFormat.format(entry.value['monto']), style: const TextStyle(fontSize: 12)),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                        onPressed: () {
+                          lista.removeAt(entry.key);
+                          onRemove(); // <--- Ahora usamos la función que pasamos por parámetro
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+      ],
+    );
+  }
+
   void _mostrarDialogoLiquidacion(
       BuildContext context,
       double totalVendido,
@@ -96,10 +298,6 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
     final c5k = TextEditingController();
     final c2k = TextEditingController();
     final cMonedas = TextEditingController();
-    final cNequi = TextEditingController();
-    final cDevoluciones = TextEditingController();
-    final cCreditos = TextEditingController();
-    final cRecaudoCreditos = TextEditingController();
 
     // Mapas de datos
     final Map<String, int> cantidades = {};
@@ -120,6 +318,12 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
       return double.tryParse(unformatted) ?? 0;
     }
 
+    // Listas para almacenar los desgloses dinámicos
+    List<Map<String, dynamic>> listaCreditosNuevos = [];
+    List<Map<String, dynamic>> listaCreditosAntiguos = [];
+    List<Map<String, dynamic>> listaNequi = [];
+    List<Map<String, dynamic>> listaDevoluciones = [];
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -128,6 +332,7 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
           builder: (modalContext, setModalState) {
 
             void recalcular() {
+              // 1. Cálculos de billetes (Efectivo Físico)
               cantidades['100k'] = int.tryParse(c100k.text.replaceAll('.', '')) ?? 0;
               cantidades['50k'] = int.tryParse(c50k.text.replaceAll('.', '')) ?? 0;
               cantidades['20k'] = int.tryParse(c20k.text.replaceAll('.', '')) ?? 0;
@@ -143,13 +348,20 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
               subtotales['2k'] = cantidades['2k']! * 2000.0;
 
               tMonedas = _parseFormatted(cMonedas.text);
-              tNequi = _parseFormatted(cNequi.text);
-              tDevoluciones = _parseFormatted(cDevoluciones.text);
-              tCreditos = _parseFormatted(cCreditos.text);
-              tRecaudoCreditos = _parseFormatted(cRecaudoCreditos.text);
 
+              // 2. Sumar montos de las listas dinámicas (JSON)
+              tNequi = listaNequi.fold(0.0, (sum, item) => sum + item['monto']);
+              tDevoluciones = listaDevoluciones.fold(0.0, (sum, item) => sum + item['monto']);
+              tCreditos = listaCreditosNuevos.fold(0.0, (sum, item) => sum + item['monto']);
+              tRecaudoCreditos = listaCreditosAntiguos.fold(0.0, (sum, item) => sum + item['monto']);
+
+              // 3. Totales Finales
+              // El esperado es lo vendido - lo que no es efectivo + lo recaudado de antes
               efectivoEsperado = (totalVendido - tDevoluciones - tCreditos - tNequi) + tRecaudoCreditos;
+
+              // El recibido es la suma de billetes + monedas
               totalRecibido = subtotales.values.fold(0.0, (a, b) => a + b) + tMonedas;
+
               diferencia = totalRecibido - efectivoEsperado;
 
               setModalState(() {});
@@ -187,17 +399,26 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
                         currencyFormat.format(totalVendido),
                         Colors.black),
 
-                    _buildInputRow('Devoluciones:', cDevoluciones, recalcular,
-                        prefix: '- \$ ', color: Colors.red),
 
-                    _buildInputRow('Créditos (Nuevos):', cCreditos, recalcular,
-                        prefix: '- \$ ', color: Colors.orange),
+                    const SizedBox(height: 10),
 
-                    _buildInputRow('Nequi (Virtual):', cNequi, recalcular,
-                        prefix: '- \$ ', color: Colors.purple, icon: Icons.phone_android),
+// --- NUEVAS FILAS DINÁMICAS ---
+                    _buildFilaDinamica('Devoluciones: -', listaDevoluciones, Colors.red, () {
+                      _abrirDialogoDetalle(context, 'Devoluciones', listaDevoluciones, recalcular);
+                    }, recalcular),
 
-                    _buildInputRow('Créditos (Antiguos):', cRecaudoCreditos, recalcular,
-                        prefix: '+ \$ ', color: Colors.teal[700], icon: Icons.account_balance_wallet),
+                    _buildFilaDinamica('Créditos (Nuevos): -', listaCreditosNuevos, Colors.orange, () {
+                      _abrirDialogoDetalle(context, 'Créditos Nuevos generados', listaCreditosNuevos, recalcular);
+                    }, recalcular),
+
+                    _buildFilaDinamica('Nequi (Virtual): -', listaNequi, Colors.purple, () {
+                      _abrirDialogoDetalle(context, 'Pagos recibidos por Nequi o virtual', listaNequi, recalcular);
+                    }, recalcular),
+
+                    _buildFilaDinamica('Créditos (Antiguos): +', listaCreditosAntiguos, Colors.teal, () {
+                      _abrirDialogoDetalle(context, 'Recaudo de Créditos Antiguos', listaCreditosAntiguos, recalcular);
+                    }, recalcular),
+// ------------------------------
 
                     const Divider(),
                     _buildTotalRow(
@@ -243,7 +464,58 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
                         setModalState(() => _isConfirming = true);
 
                         try {
+                          final cierreProv = Provider.of<CierreDiaProvider>(context, listen: false);
+                          final productoProv = Provider.of<ProductoProvider>(context, listen: false);
+                          final clienteProv = Provider.of<ClienteProvider>(context, listen: false);
+
+                          // 1. Obtener datos maestros (Detalles de DB y Productos de Provider)
+                          final todosLosDetalles = await DBHelper.obtenerTodosLosDetalles();
+                          final todosLosProductos = productoProv.productos;
+
+                          // 2. Filtrar y Agrupar (Usando la lógica centralizada del Provider)
+                          final facturasIdsEnCargues = carguesLiquidados.expand((c) => c.facturaIds).toSet();
+                          final facturasDelCargue = todasLasFacturas.where((f) => facturasIdsEnCargues.contains(f.id)).toList();
+
+                          final resumenVentasFinal = cierreProv.procesarAgrupacion(
+                              facturasDelCargue,
+                              todosLosDetalles,
+                              todosLosProductos
+                          );
+
+                          // 3. Preparar datos para persistencia en SQLite
+                          final datosLiquidacion = {
+                            'fecha': DateTime.now().toIso8601String(),
+                            'totalEfectivo': totalRecibido,
+                            'totalNequi': tNequi,
+                            'totalCreditosNuevos': tCreditos,
+                            'totalCreditosAntiguos': tRecaudoCreditos,
+                            'totalDevoluciones': tDevoluciones,
+                            'desgloseBilletes': jsonEncode({
+                              'billetes': cantidades,
+                              'total_monedas': tMonedas,
+                            }),
+                            'totalFinal': totalVendido,
+                            'observaciones': 'Liquidación de ${carguesLiquidados.length} cargues',
+                            // NUEVOS CAMPOS V4
+                            'detallesCreditosNuevos': jsonEncode(listaCreditosNuevos),
+                            'detallesCreditosAntiguos': jsonEncode(listaCreditosAntiguos),
+                            'detallesNequi': jsonEncode(listaNequi),
+                            'detallesDevoluciones': jsonEncode(listaDevoluciones),
+                          };
+
+                          final idsCargues = carguesLiquidados.map((c) => c.id).toList();
+
+                          // 4. Guardar liquidación y obtener el ID generado
+                          final int nuevoIdLiquidacion = await DBHelper.insertarLiquidacionCompleta(datosLiquidacion, idsCargues);
+
+                          // 5. Asegurar que los clientes estén cargados para el PDF
+                          if (clienteProv.clientes.isEmpty) {
+                            await clienteProv.cargarClientes();
+                          }
+
+                          // 6. Generar el PDF con el resumen ya procesado
                           final pdfBytes = await PdfGenerator.generarLiquidacionPDF(
+                            liquidacionId: nuevoIdLiquidacion,
                             totalVendido: totalVendido,
                             totalDevoluciones: tDevoluciones,
                             totalCreditos: tCreditos,
@@ -254,11 +526,20 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
                             subtotales: subtotales,
                             monedas: tMonedas,
                             carguesLiquidados: carguesLiquidados,
-                            todasLasFacturas: todasLasFacturas,
+                            todosLosClientes: clienteProv.clientes,
+                            resumenVentas: resumenVentasFinal,    // Mapa procesado por el Provider
+                            facturasDelCargue: facturasDelCargue, // Lista filtrada para el detalle final
+
+                            listaNequi: listaNequi,
+                            listaDevoluciones: listaDevoluciones,
+                            listaCreditosNuevos: listaCreditosNuevos,
+                            listaCreditosAntiguos: listaCreditosAntiguos,
                           );
 
+                          // 7. Guardar temporalmente y compartir
                           final dir = await getTemporaryDirectory();
-                          final file = File('${dir.path}/liquidacion_${DateTime.now().millisecondsSinceEpoch}.pdf');
+                          final String nombreArchivo = "Liquidacion_Caja_$nuevoIdLiquidacion.pdf";
+                          final file = File('${dir.path}/$nombreArchivo');
                           await file.writeAsBytes(pdfBytes);
 
                           await Share.shareXFiles(
@@ -268,12 +549,18 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
 
                           if (modalContext.mounted) {
                             Navigator.pop(modalContext);
+                            if (mounted) {
+                              setState(() {
+                                _carguesSeleccionados.clear();
+                              });
+                            }
                           }
 
                         } catch (e) {
+                          debugPrint("Error en liquidación: $e");
                           if (modalContext.mounted) {
                             ScaffoldMessenger.of(modalContext).showSnackBar(
-                              SnackBar(content: Text('Error al generar PDF: $e')),
+                              SnackBar(content: Text('Error en el proceso: $e')),
                             );
                           }
                         } finally {
@@ -285,7 +572,7 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
                       style: ElevatedButton.styleFrom(
                           minimumSize: const Size(double.infinity, 50)),
                       child: _isConfirming
-                          ? const CircularProgressIndicator()
+                          ? const CircularProgressIndicator(color: Colors.white)
                           : const Text('Confirmar Liquidación y Generar PDF'),
                     )
                   ],
@@ -392,32 +679,28 @@ class _LiquidacionCargueScreenState extends State<LiquidacionCargueScreen> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
         children: [
+          // NUEVO SELECTOR TIPO BUSCADOR
           Padding(
             padding: const EdgeInsets.all(12.0),
-            child: DropdownButtonFormField<int>(
-              hint: const Text('Seleccione un cargue para añadir...'),
-              value: null,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.add),
+            child: InkWell(
+              onTap: () => _abrirSelectorCargues(context, carguesDisponibles, todasLasFacturas),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.add_circle_outline, color: Colors.blue),
+                    const SizedBox(width: 10),
+                    const Text('Toca para añadir un cargue...',
+                        style: TextStyle(fontSize: 16, color: Colors.black87)),
+                    const Spacer(),
+                    const Icon(Icons.arrow_drop_down),
+                  ],
+                ),
               ),
-              items: carguesDisponibles.map((cargue) {
-                return DropdownMenuItem<int>(
-                  value: cargue.id,
-                  child: Text(
-                    '#${cargue.id} - ${cargue.conductor} (${cargue.vehiculoAsignado})',
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                );
-              }).toList(),
-              onChanged: (int? selectedId) {
-                if (selectedId != null) {
-                  setState(() {
-                    _carguesSeleccionados.add(selectedId);
-                  });
-                }
-              },
             ),
           ),
 
